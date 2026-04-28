@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Startup Intelligence Platform</title>
+    <meta name="description" content="AI-powered startup news, social & newsletter intelligence dashboard">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app">
+    <!-- Header -->
+    <header class="header">
+        <div class="header-inner">
+            <a href="/" class="logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">Startup <span>Intel</span></div>
+            </a>
+            <nav class="header-nav">
+                <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard">Dashboard</button>
+                <button class="nav-btn" onclick="showView('analytics')" id="nav-analytics">📊 Analytics</button>
+                <button class="nav-btn" onclick="showView('companies')" id="nav-companies">Companies</button>
+                <button class="nav-btn" onclick="showView('digest')" id="nav-digest">Weekly Digest</button>
+                <button class="nav-btn" onclick="showView('sources')" id="nav-sources">Sources</button>
+                <button class="nav-btn primary" onclick="showIngestionModal()" id="btn-ingest">🔄 Run Ingestion</button>
+                <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" title="Toggle light/dark mode">🌙</button>
+            </nav>
+        </div>
+    </header>
+
+    <div class="main">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Search -->
+            <div class="filter-section">
+                <div class="filter-title">Search</div>
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" class="search-input" id="search-input"
+                           placeholder="Search articles, startups..."
+                           style="padding-left: 40px;">
+                </div>
+            </div>
+
+            <!-- Source Type Filter -->
+            <div class="filter-section">
+                <div class="filter-title">Source Type</div>
+                <div class="filter-group" id="source-type-filters">
+                    <button class="filter-btn active" data-filter="source_type" data-value="">
+                        All Sources
+                    </button>
+                    <button class="filter-btn" data-filter="source_type" data-value="news">
+                        📰 News <span class="filter-badge" id="count-news">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="source_type" data-value="newsletter">
+                        📧 Newsletter <span class="filter-badge" id="count-newsletter">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="source_type" data-value="social">
+                        📱 Social <span class="filter-badge" id="count-social">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="source_type" data-value="press">
+                        📢 Press <span class="filter-badge" id="count-press">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="source_type" data-value="blog">
+                        ✍️ Blog <span class="filter-badge" id="count-blog">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Classification Filter -->
+            <div class="filter-section">
+                <div class="filter-title">Category</div>
+                <div class="filter-group" id="classification-filters">
+                    <button class="filter-btn active" data-filter="classification" data-value="">
+                        All Categories
+                    </button>
+                    <button class="filter-btn" data-filter="classification" data-value="funding">
+                        💰 Funding <span class="filter-badge" id="count-funding">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="classification" data-value="product_launch">
+                        🚀 Product <span class="filter-badge" id="count-product_launch">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="classification" data-value="milestone">
+                        📈 Milestones <span class="filter-badge" id="count-milestone">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="classification" data-value="hiring">
+                        👥 Hired <span class="filter-badge" id="count-hiring">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="classification" data-value="partnership">
+                        🤝 Partnership <span class="filter-badge" id="count-partnership">0</span>
+                    </button>
+                    <button class="filter-btn" data-filter="classification" data-value="customer_win">
+                        🎯 Customers <span class="filter-badge" id="count-customer_win">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Date Filter -->
+            <div class="filter-section">
+                <div class="filter-title">Time Period</div>
+                <div class="filter-group">
+                    <button class="filter-btn active" data-filter="date" data-value="">All Time</button>
+                    <button class="filter-btn" data-filter="date" data-value="7">Last 7 Days</button>
+                    <button class="filter-btn" data-filter="date" data-value="30">Last 30 Days</button>
+                    <button class="filter-btn" data-filter="date" data-value="90">Last 90 Days</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content-area" id="content-area">
+            <!-- Dashboard View -->
+            <div id="view-dashboard">
+                <!-- Stats -->
+                <div class="stats-grid" id="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Companies</div>
+                        <div class="stat-value" id="stat-startups">—</div>
+                        <div class="stat-detail">In portfolio</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Content Items</div>
+                        <div class="stat-value" id="stat-content">—</div>
+                        <div class="stat-detail">Total collected</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Sources</div>
+                        <div class="stat-value" id="stat-sources">—</div>
+                        <div class="stat-detail">Active feeds</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Summaries</div>
+                        <div class="stat-value" id="stat-summaries">—</div>
+                        <div class="stat-detail">Generated</div>
+                    </div>
+                </div>
+
+                <!-- Content Feed -->
+                <div class="section-header">
+                    <div>
+                        <h2 class="section-title">Latest Intelligence</h2>
+                        <p class="section-subtitle" id="feed-subtitle">All content from monitored sources</p>
+                    </div>
+                    <button class="nav-btn" onclick="clearAllContent()" style="font-size:0.8rem;color:#ef4444;border-color:rgba(239, 68, 68, 0.2);">🗑️ Clear All</button>
+                </div>
+                <div class="content-feed" id="content-feed">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>Loading content...</span>
+                    </div>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            </div>
+
+            <!-- Analytics View -->
+            <div id="view-analytics" style="display:none;">
+                <div class="section-header">
+                    <h2 class="section-title">📊 Analytics Dashboard</h2>
+                    <button class="nav-btn" onclick="reclassifyAll()" id="btn-reclassify" style="font-size:0.8rem;">🔄 Re-classify All</button>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="stats-grid" id="analytics-kpis" style="margin-bottom: 2rem;">
+                    <div class="stat-card" style="border-left: 4px solid #22c55e;">
+                        <div class="stat-label">👥 Who's Hired</div>
+                        <div class="stat-value" id="kpi-hiring">—</div>
+                        <div class="stat-detail">People hired</div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #f59e0b;">
+                        <div class="stat-label">💰 Funding Activity</div>
+                        <div class="stat-value" id="kpi-funding">—</div>
+                        <div class="stat-detail">Funding mentions</div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #8b5cf6;">
+                        <div class="stat-label">🤝 Partnerships</div>
+                        <div class="stat-value" id="kpi-partnerships">—</div>
+                        <div class="stat-detail">Partnership mentions</div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #3b82f6;">
+                        <div class="stat-label">🚀 Product Launches</div>
+                        <div class="stat-value" id="kpi-products">—</div>
+                        <div class="stat-detail">Product mentions</div>
+                    </div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                    <div class="stat-card" style="padding: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem; font-size: 1rem; color: var(--text-secondary);">Content by Category</h3>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="chart-category"></canvas>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="padding: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem; font-size: 1rem; color: var(--text-secondary);">Content by Source Type</h3>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="chart-source-type"></canvas>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="padding: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem; font-size: 1rem; color: var(--text-secondary);">Sentiment Distribution</h3>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="chart-sentiment"></canvas>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="padding: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem; font-size: 1rem; color: var(--text-secondary);">Top 10 Companies</h3>
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="chart-top-companies"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content Timeline -->
+                <div class="stat-card" style="padding: 1.5rem; margin-bottom: 2rem;">
+                    <h3 style="margin: 0 0 1rem; font-size: 1rem; color: var(--text-secondary);">Content Volume (Last 30 Days)</h3>
+                    <div style="position: relative; height: 250px;">
+                        <canvas id="chart-timeline"></canvas>
+                    </div>
+                </div>
+
+                <!-- Category Drilldowns -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="stat-card" style="padding: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem; font-size: 1rem; color: var(--text-secondary);">👥 Who's Hired?</h3>
+                        <div id="drilldown-hiring" class="drilldown-list"></div>
+                    </div>
+                    <div class="stat-card" style="padding: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem; font-size: 1rem; color: var(--text-secondary);">💰 Funding Activity</h3>
+                        <div id="drilldown-funding" class="drilldown-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Companies View -->
+            <div id="view-companies" style="display:none;">
+                <div class="section-header">
+                    <h2 class="section-title">Portfolio Companies</h2>
+                    <button class="nav-btn primary" onclick="showImportModal()">📤 Import CSV / Excel</button>
+                </div>
+                <div class="search-area">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" class="search-input" id="company-search"
+                               placeholder="Search companies..." style="padding-left: 40px;">
+                    </div>
+                </div>
+                <div class="content-feed" id="companies-list"></div>
+            </div>
+
+            <!-- Digest View -->
+            <div id="view-digest" style="display:none;">
+                <div class="section-header">
+                    <h2 class="section-title">Portfolio Digest</h2>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="digest-timeframe" class="form-select" style="padding: 6px 10px; font-size: 0.85rem; width: auto; margin-bottom: 0;">
+                            <option value="7">Last 7 Days (Weekly)</option>
+                            <option value="14">Last 14 Days (Biweekly)</option>
+                            <option value="30">Last 30 Days (Monthly)</option>
+                            <option value="90">Last 90 Days (Quarterly)</option>
+                        </select>
+                        <button class="nav-btn primary" onclick="generateDigest()">🔄 Generate Digest</button>
+                    </div>
+                </div>
+                <div id="digest-content">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>Loading digest...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sources View -->
+            <div id="view-sources" style="display:none;">
+                <div class="section-header">
+                    <h2 class="section-title">Monitored Sources</h2>
+                    <button class="nav-btn primary" onclick="showAddSource()">+ Add Source</button>
+                </div>
+                <div class="content-feed" id="sources-list"></div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Ingestion Modal -->
+<div class="modal-overlay" id="modal-ingestion">
+    <div class="modal" style="max-width: 600px;">
+        <h2>🔄 Run Ingestion</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1rem;">Choose which companies to run ingestion for.</p>
+        <div style="display: flex; gap: 8px; margin-bottom: 1rem;">
+            <button class="nav-btn primary" onclick="runIngestion('all')" id="btn-ingest-all">🌐 Ingest All Companies</button>
+            <button class="nav-btn" onclick="toggleCompanyPicker()" id="btn-toggle-picker">☑️ Select Specific</button>
+        </div>
+        <div id="company-picker" style="display: none;">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 0.75rem;">
+                <input type="text" class="form-input" id="picker-search" placeholder="Filter companies..." style="flex: 1; margin: 0;">
+                <button class="nav-btn" onclick="toggleAllPicker()" style="font-size: 0.8rem;">Select All</button>
+            </div>
+            <div id="company-checklist" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px;"></div>
+            <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-muted);" id="picker-count">0 selected</span>
+                <button class="nav-btn primary" onclick="runIngestion('selected')">🚀 Run Selected</button>
+            </div>
+        </div>
+        <div id="ingestion-progress" style="display: none; margin-top: 1rem;">
+            <div class="loading">
+                <div class="spinner"></div>
+                <span id="ingestion-status">Running ingestion...</span>
+            </div>
+        </div>
+        <div style="margin-top: 1rem; text-align: right;">
+            <button class="nav-btn" onclick="closeModal('modal-ingestion')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Import CSV Modal -->
+<div class="modal-overlay" id="modal-import">
+    <div class="modal">
+        <h2>📤 Import Companies</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1rem;">Upload a CSV or Excel (.xlsx) file from Monday.com. Duplicates will be automatically skipped.</p>
+        <div class="form-group">
+            <label class="form-label">File (.csv or .xlsx)</label>
+            <input type="file" id="import-file" accept=".csv,.xlsx,.xls" class="form-input" style="padding: 10px;">
+        </div>
+        <div id="import-result" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: 8px; background: var(--bg-sidebar);"></div>
+        <div class="form-actions">
+            <button class="nav-btn" onclick="closeModal('modal-import')">Close</button>
+            <button class="nav-btn primary" onclick="submitImport()" id="btn-import">Upload & Import</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Content Modal -->
+<div class="modal-overlay" id="modal-add-content">
+    <div class="modal">
+        <h2>Add Content Manually</h2>
+        <div class="form-group">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-input" id="manual-title">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Content / Body</label>
+            <textarea class="form-textarea" id="manual-content" placeholder="Paste newsletter or article text..."></textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Source Type</label>
+            <select class="form-select" id="manual-source-type">
+                <option value="newsletter">Newsletter</option>
+                <option value="press">Press Release</option>
+                <option value="social">Social Post</option>
+                <option value="news">News Article</option>
+                <option value="blog">Blog Post</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Source Name</label>
+            <input type="text" class="form-input" id="manual-source-name" placeholder="e.g. TechCrunch, Founder Newsletter">
+        </div>
+        <div class="form-group">
+            <label class="form-label">URL (optional)</label>
+            <input type="text" class="form-input" id="manual-url" placeholder="https://...">
+        </div>
+        <div class="form-actions">
+            <button class="nav-btn" onclick="closeModal('modal-add-content')">Cancel</button>
+            <button class="nav-btn primary" onclick="submitManualContent()">Add Content</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="/static/js/app.js?v=3"></script>
+</body>
+</html>

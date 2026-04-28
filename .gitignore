@@ -1,0 +1,62 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+
+# Database files
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.pytest_cache/
+test_results.txt
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Output files from dev testing
+ddgs_news_out.txt
+ddgs_out.txt
+gn_out.txt
+test_forge_out.txt
+
+# Uploaded files
+*.xlsx
+*.xls
+
+# Misc
+=
+
+# Local dev scratch scripts at the project root (the real tests live in tests/)
+/test_ddgs.py
+/test_ddgs_news.py
+/test_digest.py
+/test_forge_feed.py
+/test_forge_site.py
+/test_gn.py
+/test_gs.py
+/test_gs2.py
+/test_linkedin.py
+/test_scrape.py
+
+# Claude Code workspace files
+.claude/
