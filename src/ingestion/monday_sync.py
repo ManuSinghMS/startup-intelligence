@@ -215,7 +215,9 @@ async def fetch_board_items(board_id: str, group_id: Optional[str] = None) -> Li
                     items {
                         id
                         name
-                        group_id
+                        group {
+                            id
+                        }
                         column_values {
                             id
                             text
@@ -236,7 +238,9 @@ async def fetch_board_items(board_id: str, group_id: Optional[str] = None) -> Li
                         items {
                             id
                             name
-                            group_id
+                            group {
+                                id
+                            }
                             column_values {
                                 id
                                 text
@@ -257,7 +261,7 @@ async def fetch_board_items(board_id: str, group_id: Optional[str] = None) -> Li
 
         # Filter by group if specified
         if group_filter_id:
-            items = [i for i in items if i.get("group_id") == group_filter_id]
+            items = [i for i in items if i.get("group", {}).get("id") == group_filter_id]
 
         # Enrich items with column titles
         for item in items:
