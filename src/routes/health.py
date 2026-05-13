@@ -103,6 +103,32 @@ async def trigger_ingestion(body: IngestRequest = None):
     }
 
 
+@router.get("/ingest/status")
+def get_ingestion_status():
+    """Get ingestion progress and history."""
+    db = get_db()
+    
+    # Total active companies
+    total = db.execute("SELECT COUNT(*) as c FROM startups WHERE tag IS NULL OR tag != 'not_active'").fetchone()
+    
+    # Companies ingested in the last hour (this batch cycle)
+    recently_ingested = db.execute("""
+        SELECT name, last_ingested_at FROM startups 
+        WHERE last_ingested_at > datetime('now', '-1 hour')
+        ORDER BY last_ingested_at DESC
+    """).fetchall()
+    
+    recent_list = [dict(row) for row in recently_ingested]
+    recent_count = len(recent_list)
+    
+    return {
+        "total_companies": total["c"],
+        "recently_ingested": recent_count,
+        "remaining": max(0, total["c"] - recent_count),
+        "companies_this_batch": recent_list
+    }
+
+
 @router.post("/classify")
 async def trigger_classification():
     """Manually trigger classification of unclassified items."""
@@ -139,7 +165,7 @@ def get_analytics():
 
     total_items = db.execute("SELECT COUNT(*) as c FROM content_items").fetchone()["c"]
     total_startups = db.execute(
-        "SELECT COUNT(*) as c FROM startups WHERE tag IS NULL OR tag != 'not_active'"
+        "SELECT COUNT(*) as c FROM startups WHERE tag IS NULL OR (tag != 'not_active' AND tag != 'forge')"
     ).fetchone()["c"]
 
     by_classification = db.execute("""

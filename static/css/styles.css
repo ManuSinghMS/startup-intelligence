@@ -481,38 +481,111 @@ body::before {
 }
 
 /* ========== DIGEST / SUMMARY VIEW ========== */
-.digest-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 2rem;
-    backdrop-filter: blur(10px);
+.digest-meta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 1.5rem;
+    padding: 10px 16px;
+    background: rgba(99, 102, 241, 0.07);
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    color: var(--text-muted);
 }
 
-.digest-card h3 {
-    font-size: 1rem;
+.digest-meta-period {
     font-weight: 600;
-    margin-bottom: 1rem;
     color: var(--accent-light);
 }
 
-.digest-content {
-    font-size: 0.875rem;
-    line-height: 1.8;
-    color: var(--text-secondary);
+.digest-meta-sep {
+    opacity: 0.4;
 }
 
-.digest-content strong {
+.company-digest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.25rem;
+}
+
+.company-digest-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.company-digest-card.company-digest-empty {
+    opacity: 0.5;
+}
+
+.company-digest-header {
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.company-digest-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-light);
+    margin: 0;
+}
+
+.company-digest-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.company-digest-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.company-digest-section ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+}
+
+.company-digest-section li {
+    margin-bottom: 2px;
+}
+
+.company-digest-action {
+    padding: 9px 12px;
+    background: rgba(99, 102, 241, 0.08);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 0.82rem;
+}
+
+.company-digest-action-label {
+    display: block;
+    font-size: 0.67rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--accent-light);
+    margin-bottom: 3px;
+}
+
+.company-digest-action-text {
     color: var(--text-primary);
 }
 
-.digest-content ul {
-    padding-left: 1rem;
-}
-
-.digest-content li {
-    margin-bottom: 4px;
+.company-digest-no-activity {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0;
+    font-style: italic;
 }
 
 /* ========== COMPANY PAGE ========== */

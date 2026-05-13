@@ -3,11 +3,21 @@ Company-specific news ingester.
 Instead of scraping general feeds and hoping to match,
 this searches Google News for EACH company by name.
 This guarantees all results are mapped to a specific startup.
+
+CLI Options:
+  --sleep-seconds N       Sleep N seconds between companies (default: 30)
+  --batch-size N         Process N companies per batch (default: 10)
+  --max-search-requests N  Maximum search requests per run (default: 50)
+  --disable-web-search   Skip DuckDuckGo generic web search
+  --resume               Skip companies already ingested recently
 """
+import argparse
+import asyncio
 import hashlib
 import json
+import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import quote_plus
 
@@ -16,6 +26,178 @@ import httpx
 
 from src.db.database import get_db
 from src.ingestion.html_scraper import scrape_and_store
+
+
+# ---------------------------------------------------------------------------
+# CLI Configuration
+# ---------------------------------------------------------------------------
+
+# Default configuration values
+DEFAULT_SLEEP_SECONDS = 30
+DEFAULT_BATCH_SIZE = 10
+DEFAULT_MAX_SEARCH_REQUESTS = 50
+
+# Global rate limit state
+_rate_limited = False
+_rate_limit_expiry = None
+_search_request_count = 0
+
+
+def parse_cli_args():
+    """Parse command-line arguments for ingestion control."""
+    parser = argparse.ArgumentParser(
+        description="Company news ingester CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--sleep-seconds", type=int, default=DEFAULT_SLEEP_SECONDS,
+        help=f"Sleep N seconds between companies (default: {DEFAULT_SLEEP_SECONDS})"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=DEFAULT_BATCH_SIZE,
+        help=f"Process N companies per batch (default: {DEFAULT_BATCH_SIZE})"
+    )
+    parser.add_argument(
+        "--max-search-requests", type=int, default=DEFAULT_MAX_SEARCH_REQUESTS,
+        help=f"Maximum search requests per run (default: {DEFAULT_MAX_SEARCH_REQUESTS})"
+    )
+    parser.add_argument(
+        "--disable-web-search", action="store_true",
+        help="Skip DuckDuckGo generic web search (use only RSS/Google News)"
+    )
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="Skip companies ingested within the last 24 hours"
+    )
+    return parser.parse_args()
+
+
+
+
+# ---------------------------------------------------------------------------
+# Search Result Caching
+# ---------------------------------------------------------------------------
+
+def _get_cache_dir():
+    """Get or create the search cache directory."""
+    cache_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "search_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
+
+
+def _get_cache_key(query: str) -> str:
+    """Generate a cache key from a search query."""
+    return hashlib.sha256(query.encode()).hexdigest()
+
+
+def get_cached_results(query: str) -> Optional[list]:
+    """Get cached search results if they exist and are not expired."""
+    cache_dir = _get_cache_dir()
+    cache_key = _get_cache_key(query)
+    cache_file = os.path.join(cache_dir, f"{cache_key}.json")
+    
+    if not os.path.exists(cache_file):
+        return None
+    
+    try:
+        with open(cache_file, "r") as f:
+            cache_data = json.load(f)
+        
+        # Check if cache is expired (24 hours)
+        cached_at = datetime.fromisoformat(cache_data.get("cached_at", "2000-01-01"))
+        if datetime.utcnow() - cached_at > timedelta(hours=24):
+            return None
+        
+        return cache_data.get("results")
+    except Exception:
+        return None
+
+
+def cache_results(query: str, results: list):
+    """Cache search results for future use."""
+    cache_dir = _get_cache_dir()
+    cache_key = _get_cache_key(query)
+    cache_file = os.path.join(cache_dir, f"{cache_key}.json")
+    
+    try:
+        with open(cache_file, "w") as f:
+            json.dump({
+                "query": query,
+                "results": results,
+                "cached_at": datetime.utcnow().isoformat()
+            }, f)
+    except Exception:
+        pass  # Cache failures are non-fatal
+
+
+# ---------------------------------------------------------------------------
+# Rate Limit Handling
+# ---------------------------------------------------------------------------
+
+def is_rate_limited() -> bool:
+    """Check if we're currently rate-limited."""
+    global _rate_limited, _rate_limit_expiry
+    
+    if _rate_limited and _rate_limit_expiry:
+        if datetime.utcnow() < _rate_limit_expiry:
+            return True
+        # Rate limit expired, reset state
+        _rate_limited = False
+        _rate_limit_expiry = None
+    
+    return False
+
+
+def handle_rate_limit(error_msg: str):
+    """Handle DuckDuckGo rate limiting."""
+    global _rate_limited, _rate_limit_expiry
+    
+    if "202" in error_msg or "ratelimit" in error_msg.lower():
+        _rate_limited = True
+        # Default to 1 hour cooldown
+        _rate_limit_expiry = datetime.utcnow() + timedelta(hours=1)
+        print(f"\n[Search] DuckDuckGo rate-limited. Stopping web search for this run.")
+        print(f"[Search] Try again later or use manual/Monday URLs.")
+        return True
+    
+    return False
+
+
+def increment_search_count():
+    """Increment the search request counter."""
+    global _search_request_count
+    _search_request_count += 1
+
+
+def get_search_count() -> int:
+    """Get the current search request count."""
+    return _search_request_count
+
+
+def reset_search_count():
+    """Reset the search request counter."""
+    global _search_request_count
+    _search_request_count = 0
+
+
+async def ddgs_search_with_backoff(query: str, max_results: int = 5) -> Optional[list]:
+    """Run a DuckDuckGo search with exponential backoff on rate limits."""
+    delays = [30, 60, 120]
+    for attempt, delay in enumerate(delays, start=1):
+        try:
+            from duckduckgo_search import DDGS
+            results = DDGS().text(query, max_results=max_results)
+            return results
+        except Exception as e:
+            msg = str(e)
+            if "202" in msg or "ratelimit" in msg.lower() or "Ratelimit" in msg:
+                print(f"    [DDGS] Rate limited. Waiting {delay}s before retry {attempt}/{len(delays)}...")
+                await asyncio.sleep(delay)
+            else:
+                print(f"    duckduckgo_search error: {e}")
+                return None
+    print(f"    [DDGS] Giving up after {len(delays)} retries.")
+    return None
 
 
 def hash_content(url: str, title: str) -> str:
@@ -305,7 +487,12 @@ async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
         except Exception as e:
             print(f"    Error scraping website {website}: {e}")
 
-    # Generic Web Search (Top 10 links)
+    # Generic Web Search (disabled by default — DDG rate-limits aggressively on free tier)
+    # Set ENABLE_DDGS=true in environment to enable
+    if os.environ.get("ENABLE_DDGS", "").lower() != "true":
+        db.commit()
+        return stats
+
     try:
         from duckduckgo_search import DDGS
         search_query = f"{name} startup news"
@@ -316,7 +503,7 @@ async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
         
         top_links = []
         try:
-            results = DDGS().text(search_query, max_results=5)
+            results = await ddgs_search_with_backoff(search_query, max_results=5)
             if results:
                 # Strip common corporate suffixes for a cleaner, full-name match
                 clean_name = name.lower()
@@ -337,7 +524,7 @@ async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
                         print(f"    [DDGS Filter] Rejected irrelevant result: {r.get('href')}")
         except Exception as e:
             print(f"    duckduckgo_search error: {e}")
-            
+
         for link in top_links:
             # Skip domains that heavily block basic scrapers or aren't articles
             if any(domain in link for domain in ["linkedin.com", "twitter.com", "facebook.com", "youtube.com", "instagram.com"]):
@@ -456,7 +643,7 @@ async def _run_ingestion(startups: list) -> list:
     return results
 
 
-async def ingest_all_companies(limit: int = 10) -> list:
+async def ingest_all_companies(limit: int = 20) -> list:
     """
     Run ingestion for a rolling batch of companies.
     Selects the `limit` number of companies with the oldest `last_ingested_at`
@@ -474,7 +661,7 @@ async def ingest_all_companies(limit: int = 10) -> list:
             "type": "blog",
             "rss_feed_url": "https://theforge.mcmaster.ca/feed/"
         }
-        forge_stats = await ingest_feed(master_source)
+        forge_stats = await ingest_feed(master_source, fallback_startup_id="the-forge-mcmaster")
         print(f"[Ingestion] The Forge Feed: {forge_stats.get('matched', 0)} articles matched, {forge_stats.get('new', 0)} newly inserted.")
     except Exception as e:
         print(f"[Ingestion] Error pulling The Forge RSS Feed: {e}")

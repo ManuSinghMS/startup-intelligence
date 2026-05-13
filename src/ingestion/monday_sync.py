@@ -30,7 +30,7 @@ import json
 import uuid
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 
 import httpx
 
@@ -111,7 +111,7 @@ def _get_column_map() -> dict:
 # GraphQL queries
 # ---------------------------------------------------------------------------
 
-async def _graphql(query: str, variables: dict | None = None) -> dict:
+async def _graphql(query: str, variables: Optional[Dict] = None) -> Dict:
     """Execute a Monday.com GraphQL query."""
     cfg = _get_config()
     headers = {
@@ -141,7 +141,7 @@ async def _graphql(query: str, variables: dict | None = None) -> dict:
         return data.get("data", {})
 
 
-async def fetch_board_columns(board_id: str) -> list[dict]:
+async def fetch_board_columns(board_id: str) -> List[Dict]:
     """Fetch column definitions from a board (for preview/mapping)."""
     query = """
     query ($boardId: [ID!]!) {
@@ -162,11 +162,47 @@ async def fetch_board_columns(board_id: str) -> list[dict]:
     return boards[0].get("columns", [])
 
 
-async def fetch_board_items(board_id: str) -> list[dict]:
+async def fetch_board_groups(board_id: str) -> List[Dict]:
+    """Fetch all groups (sections) on a board."""
+    query = """
+    query ($boardId: [ID!]!) {
+        boards(ids: $boardId) {
+            groups {
+                id
+                title
+            }
+        }
+    }
     """
-    Fetch all items from a Monday.com board.
+    data = await _graphql(query, {"boardId": [board_id]})
+    boards = data.get("boards", [])
+    if not boards:
+        return []
+    return boards[0].get("groups", [])
+
+
+async def fetch_board_items(board_id: str, group_id: Optional[str] = None) -> List[Dict]:
+    """
+    Fetch items from a Monday.com board.
+    Optionally filter by group_id (group title or group id).
     Handles pagination via cursor.
     """
+    # First, fetch board columns to map ID -> title
+    columns = await fetch_board_columns(board_id)
+    col_id_to_title = {col["id"]: col["title"] for col in columns}
+
+    # If group filter provided, fetch groups and find matching ID
+    group_filter_id = None
+    if group_id:
+        groups = await fetch_board_groups(board_id)
+        for g in groups:
+            if g["title"].lower() == group_id.lower() or g["id"] == group_id:
+                group_filter_id = g["id"]
+                logger.info("Filtering by group: %s (%s)", g["title"], g["id"])
+                break
+        if not group_filter_id:
+            logger.warning("Group '%s' not found on board", group_id)
+
     all_items = []
     cursor = None
 
@@ -179,9 +215,9 @@ async def fetch_board_items(board_id: str) -> list[dict]:
                     items {
                         id
                         name
+                        group_id
                         column_values {
                             id
-                            title
                             text
                             value
                         }
@@ -200,9 +236,9 @@ async def fetch_board_items(board_id: str) -> list[dict]:
                         items {
                             id
                             name
+                            group_id
                             column_values {
                                 id
-                                title
                                 text
                                 value
                             }
@@ -218,6 +254,18 @@ async def fetch_board_items(board_id: str) -> list[dict]:
             page = boards[0].get("items_page", {})
 
         items = page.get("items", [])
+
+        # Filter by group if specified
+        if group_filter_id:
+            items = [i for i in items if i.get("group_id") == group_filter_id]
+
+        # Enrich items with column titles
+        for item in items:
+            for col_val in item.get("column_values", []):
+                col_id = col_val.get("id", "")
+                if col_id in col_id_to_title:
+                    col_val["title"] = col_id_to_title[col_id]
+
         all_items.extend(items)
 
         cursor = page.get("cursor")
@@ -257,7 +305,7 @@ def _map_item_to_startup(item: dict, column_map: dict) -> dict:
 def _upsert_startup(startup_data: dict, dry_run: bool = False) -> tuple[str, str]:
     """
     Insert or update a startup. Matches by name (case-insensitive).
-    Returns (action: 'created'|'updated'|'skipped', startup_id).
+    Returns (action: 'created'|'updated'|'skipped'|'would_create'|'would_update', startup_id or empty).
     """
     if not startup_data.get("name"):
         return "skipped", ""
@@ -271,7 +319,10 @@ def _upsert_startup(startup_data: dict, dry_run: bool = False) -> tuple[str, str
     ).fetchone()
 
     if dry_run:
-        return "would_update" if existing else "would_create"
+        if existing:
+            return "would_update", existing["id"]
+        else:
+            return "would_create", ""
 
     now = datetime.utcnow().isoformat()
 

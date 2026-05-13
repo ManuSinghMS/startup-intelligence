@@ -49,6 +49,20 @@ def get_entry_content(entry) -> str:
     return ""
 
 
+_DOMAIN_SUFFIXES = (".ai", ".io", ".com", ".co", ".app", ".inc", " inc.", " inc", " corp.", " corp", " llc", " ltd")
+
+
+def _name_variants(name: str) -> list:
+    """Return matching variants of a company name (strip domain suffixes, etc.)."""
+    variants = [name]
+    lower = name.lower()
+    for suffix in _DOMAIN_SUFFIXES:
+        if lower.endswith(suffix):
+            variants.append(name[: -len(suffix)].strip(" .,"))
+            break
+    return variants
+
+
 def match_startup(text: str, startups: list) -> Optional[dict]:
     """
     Check if any startup name appears in the text.
@@ -56,15 +70,13 @@ def match_startup(text: str, startups: list) -> Optional[dict]:
     """
     text_lower = text.lower()
     for startup in startups:
-        name = startup["name"].lower()
-        # Exact match or word-boundary match
-        if name in text_lower:
-            return startup
-        # Also try legal name
-        if startup.get("legal_name"):
-            legal = startup["legal_name"].lower()
-            if legal in text_lower:
+        for variant in _name_variants(startup["name"]):
+            if len(variant) >= 3 and variant.lower() in text_lower:
                 return startup
+        if startup.get("legal_name"):
+            for variant in _name_variants(startup["legal_name"]):
+                if len(variant) >= 3 and variant.lower() in text_lower:
+                    return startup
     return None
 
 
@@ -80,7 +92,7 @@ async def fetch_feed(feed_url: str, timeout: float = 30.0) -> Optional[feedparse
         return None
 
 
-async def ingest_feed(source: dict, max_items: int = 50) -> dict:
+async def ingest_feed(source: dict, max_items: int = 50, fallback_startup_id: str = None) -> dict:
     """
     Ingest articles from a single RSS feed source.
     Returns stats about what was ingested.
@@ -123,17 +135,21 @@ async def ingest_feed(source: dict, max_items: int = 50) -> dict:
         matched_startup = match_startup(full_text, startups)
 
         item_id = str(uuid.uuid4())
-        startup_id = matched_startup["id"] if matched_startup else None
+        startup_id = matched_startup["id"] if matched_startup else fallback_startup_id
 
         if matched_startup:
             stats["matched"] += 1
+
+        # Only use source_id if it actually exists in the sources table
+        db_source = db.execute("SELECT id FROM sources WHERE id = ?", (source["id"],)).fetchone()
+        source_id = db_source["id"] if db_source else None
 
         db.execute(
             """INSERT INTO content_items
             (id, startup_id, source_id, source_type, source_name, url, title,
              published_at, raw_content, content_hash, classification)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (item_id, startup_id, source["id"], source["type"], source["name"],
+            (item_id, startup_id, source_id, source["type"], source["name"],
              url, title, published, content, content_hash, "unclassified")
         )
         stats["new"] += 1

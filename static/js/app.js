@@ -754,6 +754,35 @@ async function submitImport() {
     }
 }
 
+async function syncFromMonday() {
+    const btn = document.getElementById('btn-sync-monday');
+    const originalText = btn.textContent;
+    btn.textContent = '⏳ Syncing...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${API}/api/startups/sync-monday`, {
+            method: 'POST',
+        });
+        const data = await res.json();
+
+        if (res.ok && data.status === 'completed') {
+            const msg = `Synced ${data.created} new + ${data.updated} updated (${data.skipped} skipped)`;
+            showToast(msg, 'success');
+            loadCompanies();
+        } else if (data.status === 'not_configured') {
+            showToast('Monday.com not configured — set MONDAY_API_TOKEN and MONDAY_BOARD_ID in .env', 'error');
+        } else {
+            showToast(data.message || 'Sync failed', 'error');
+        }
+    } catch (e) {
+        showToast('Sync failed — check server logs', 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
 // ========== INGESTION MODAL ==========
 
 let allCompaniesCache = [];
@@ -846,7 +875,21 @@ async function runIngestion(mode) {
             body: JSON.stringify(body),
         });
         const data = await res.json();
-        statusEl.textContent = `✅ Done! ${data.total_new} new items found, ${data.classified || 0} classified.`;
+        
+        // Fetch ingestion status to show which companies were processed
+        let companyList = '';
+        try {
+            const statusRes = await fetch(`${API}/api/ingest/status`);
+            const statusData = await statusRes.json();
+            if (statusData.companies_this_batch && statusData.companies_this_batch.length > 0) {
+                const companies = statusData.companies_this_batch.map(c => c.name).join(', ');
+                companyList = `<br><small style="color: #666;">Processed: ${companies}</small>`;
+            }
+        } catch (e) {
+            console.warn('Could not fetch ingestion status:', e);
+        }
+        
+        statusEl.innerHTML = `✅ Done! ${data.total_new} new items found, ${data.classified || 0} classified.${companyList}`;
         showToast(`Ingestion complete: ${data.total_new} new items`, 'success');
         loadDashboard();
         setTimeout(() => closeModal('modal-ingestion'), 2000);
@@ -859,34 +902,120 @@ async function runIngestion(mode) {
 
 // ========== DIGEST ==========
 
+function _digestEscape(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function renderDigestData(digest) {
+    const companies = digest.companies || [];
+    const periodStart = digest.period_start || '';
+    const periodEnd = digest.period_end || '';
+    const periodDays = digest.period_days || digest.period_days;
+    const periodLabel = periodStart && periodEnd
+        ? `${periodStart} → ${periodEnd}`
+        : periodDays ? `Last ${periodDays} days` : '';
+    const generatedAt = digest.created_at
+        ? new Date(digest.created_at).toLocaleString()
+        : '';
+    const itemCount = digest.items_count != null ? digest.items_count : '';
+
+    const metaBar = `
+        <div class="digest-meta-bar">
+            <span class="digest-meta-period">📅 ${_digestEscape(periodLabel)}</span>
+            <span class="digest-meta-sep">·</span>
+            <span>${companies.length} companies</span>
+            ${itemCount !== '' ? `<span class="digest-meta-sep">·</span><span>${itemCount} content items</span>` : ''}
+            ${generatedAt ? `<span class="digest-meta-sep">·</span><span>Generated ${_digestEscape(generatedAt)}</span>` : ''}
+        </div>`;
+
+    if (digest.legacy) {
+        return metaBar + `
+            <div class="empty-state">
+                <div class="icon">🔄</div>
+                <h3>Digest format outdated</h3>
+                <p>Click "Generate Digest" to create an updated per-company digest.</p>
+            </div>`;
+    }
+
+    if (!companies.length) {
+        return metaBar + `
+            <div class="empty-state">
+                <div class="icon">📋</div>
+                <h3>No company activity found in this period</h3>
+                <p>Try a longer timeframe or run ingestion to pull in recent content.</p>
+            </div>`;
+    }
+
+    const cards = companies.map(c => {
+        const sections = [
+            { label: '📌 Key Updates',                items: c.key_updates },
+            { label: '🔗 LinkedIn & Founder Activity', items: c.linkedin_activity },
+            { label: '📰 News & Web Mentions',         items: c.news_mentions },
+            { label: '🚀 Opportunities',               items: c.opportunities },
+            { label: '⚠️ Risks & Concerns',            items: c.risks },
+        ].filter(s => Array.isArray(s.items) && s.items.length > 0);
+
+        const hasContent = sections.length > 0 || c.next_action;
+
+        if (!hasContent) {
+            return `
+                <div class="stat-card company-digest-card company-digest-empty">
+                    <div class="company-digest-header">
+                        <h3 class="company-digest-name">${_digestEscape(c.company)}</h3>
+                    </div>
+                    <p class="company-digest-no-activity">No notable activity in this period.</p>
+                </div>`;
+        }
+
+        const sectionsHtml = sections.map(s => `
+            <div class="company-digest-section">
+                <div class="company-digest-section-label">${s.label}</div>
+                <ul>${s.items.map(i => `<li>${_digestEscape(String(i))}</li>`).join('')}</ul>
+            </div>`).join('');
+
+        const nextAction = c.next_action ? `
+            <div class="company-digest-action">
+                <span class="company-digest-action-label">Recommended Next Action</span>
+                <span class="company-digest-action-text">${_digestEscape(String(c.next_action))}</span>
+            </div>` : '';
+
+        return `
+            <div class="stat-card company-digest-card">
+                <div class="company-digest-header">
+                    <h3 class="company-digest-name">${_digestEscape(c.company)}</h3>
+                </div>
+                <div class="company-digest-body">
+                    ${sectionsHtml}
+                    ${nextAction}
+                </div>
+            </div>`;
+    }).join('');
+
+    return metaBar + `<div class="company-digest-grid">${cards}</div>`;
+}
+
 async function loadDigest() {
     const container = document.getElementById('digest-content');
     container.innerHTML = '<div class="loading"><div class="spinner"></div><span>Loading digest...</span></div>';
 
     try {
-        const res = await fetch(`${API}/api/summaries/history?summary_type=weekly_digest&limit=5`);
+        const days = document.getElementById('digest-timeframe')?.value || '7';
+        const res = await fetch(`${API}/api/summaries/digest/current?days=${days}`);
         const data = await res.json();
 
-        if (data.summaries.length === 0) {
+        if (!data.digest) {
             container.innerHTML = `
                 <div class="empty-state">
                     <div class="icon">📊</div>
-                    <h3>No digests generated yet</h3>
-                    <p>Click "Generate New Digest" to create your first weekly digest.</p>
+                    <h3>No digest generated yet</h3>
+                    <p>Select a timeframe above and click "Generate Digest" to create your first portfolio digest.</p>
                 </div>`;
             return;
         }
 
-        container.innerHTML = data.summaries.map(s => `
-            <div class="digest-card">
-                <h3>📊 ${s.summary_type === 'weekly_digest' ? 'Weekly Digest' : s.summary_type}
-                    <span style="font-weight: 400; font-size: 0.75rem; color: var(--text-muted); margin-left: 8px;">
-                        ${new Date(s.created_at).toLocaleDateString()}
-                    </span>
-                </h3>
-                <div class="digest-content">${renderMarkdown(s.content)}</div>
-            </div>
-        `).join('');
+        container.innerHTML = renderDigestData(data.digest);
     } catch (e) {
         container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to load digest</h3></div>';
     }
@@ -894,27 +1023,26 @@ async function loadDigest() {
 
 async function generateDigest() {
     const container = document.getElementById('digest-content');
-    container.innerHTML = '<div class="loading"><div class="spinner"></div><span>Generating weekly digest... this may take a moment.</span></div>';
+    const days = document.getElementById('digest-timeframe')?.value || '7';
+    container.innerHTML = `<div class="loading"><div class="spinner"></div><span>Generating ${days}-day digest — this may take up to a minute...</span></div>`;
 
     try {
-        const days = document.getElementById('digest-timeframe')?.value || '7';
         const res = await fetch(`${API}/api/summaries/digest?days=${days}`);
+        if (!res.ok) throw new Error('Generation failed');
         const data = await res.json();
 
-        container.innerHTML = `
-            <div class="digest-card">
-                <h3>📊 Weekly Portfolio Digest
-                    <span style="font-weight: 400; font-size: 0.75rem; color: var(--text-muted); margin-left: 8px;">
-                        Just generated
-                    </span>
-                </h3>
-                <div class="digest-content">${renderMarkdown(data.summary)}</div>
-                <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">
-                    Based on ${data.items_count} content items from the past ${data.period_days || days} days.
-                </div>
-            </div>`;
+        const digestRow = {
+            period_days:      data.period_days,
+            period_start:     data.period_start,
+            period_end:       data.period_end,
+            items_count:      data.items_count,
+            companies_count:  data.companies_count,
+            created_at:       new Date().toISOString(),
+            companies:        data.companies,
+        };
 
-        showToast('Digest generated successfully!', 'success');
+        container.innerHTML = renderDigestData(digestRow);
+        showToast(data.updated_existing ? 'Digest updated!' : 'Digest generated!', 'success');
     } catch (e) {
         container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to generate digest</h3></div>';
         showToast('Failed to generate digest', 'error');
@@ -954,6 +1082,50 @@ async function loadSources() {
         `).join('');
     } catch (e) {
         container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to load sources</h3></div>';
+    }
+}
+
+// ========== SOURCES ==========
+
+function showAddSource() {
+    document.getElementById('modal-add-source').classList.add('active');
+    document.getElementById('source-name').value = '';
+    document.getElementById('source-url').value = '';
+    document.getElementById('source-rss').value = '';
+    document.getElementById('source-priority').value = '3';
+}
+
+async function submitAddSource() {
+    const name = document.getElementById('source-name').value.trim();
+    if (!name) {
+        showToast('Name is required', 'error');
+        return;
+    }
+
+    const body = {
+        name,
+        type: document.getElementById('source-type').value,
+        url: document.getElementById('source-url').value.trim() || null,
+        rss_feed_url: document.getElementById('source-rss').value.trim() || null,
+        priority: parseInt(document.getElementById('source-priority').value) || 3,
+    };
+
+    try {
+        const res = await fetch(`${API}/api/sources`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (res.ok) {
+            showToast('Source added!', 'success');
+            closeModal('modal-add-source');
+            loadSources();
+        } else {
+            const err = await res.json();
+            showToast(err.detail || 'Failed to add source', 'error');
+        }
+    } catch (e) {
+        showToast('Failed to add source', 'error');
     }
 }
 

@@ -1,6 +1,9 @@
 """
 Summary and digest routes.
 """
+import json as _json
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 
@@ -22,11 +25,56 @@ async def get_company_summary(
     return result
 
 
+@router.get("/digest/current")
+def get_current_digest(days: int = Query(7, ge=1, le=90)):
+    """Return the most recently stored digest (no generation)."""
+    db = get_db()
+    now = datetime.utcnow()
+    period_start = (now - timedelta(days=days)).strftime("%Y-%m-%d")
+    period_end = now.strftime("%Y-%m-%d")
+
+    # Prefer exact-period match; fall back to latest of any period
+    row = db.execute(
+        """SELECT * FROM summaries
+           WHERE summary_type = 'weekly_digest' AND period_start = ? AND period_end = ?
+           LIMIT 1""",
+        (period_start, period_end)
+    ).fetchone()
+
+    if not row:
+        row = db.execute(
+            """SELECT * FROM summaries
+               WHERE summary_type = 'weekly_digest'
+               ORDER BY created_at DESC LIMIT 1"""
+        ).fetchone()
+
+    if not row:
+        return {"digest": None}
+
+    row = dict(row)
+    try:
+        parsed = _json.loads(row["content"])
+        if isinstance(parsed, dict) and "companies" in parsed:
+            row["companies"] = parsed["companies"]
+            row["period_days"] = parsed.get("period_days", days)
+        elif isinstance(parsed, list):
+            row["companies"] = parsed
+            row["period_days"] = days
+        else:
+            row["companies"] = []
+            row["legacy"] = True
+    except Exception:
+        row["companies"] = []
+        row["legacy"] = True
+
+    return {"digest": row}
+
+
 @router.get("/digest")
 async def get_weekly_digest(
     days: int = Query(7, ge=1, le=90, description="Number of days for digest")
 ):
-    """Generate a weekly digest across all portfolio companies."""
+    """Generate (or replace) a weekly digest across all portfolio companies."""
     return await weekly_digest(days)
 
 

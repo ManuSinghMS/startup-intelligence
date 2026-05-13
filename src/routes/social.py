@@ -1,7 +1,7 @@
 """
 LinkedIn & social media API routes.
 """
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Query
 
@@ -84,7 +84,7 @@ class ManualPostInput(BaseModel):
 
 class ManualPostsRequest(BaseModel):
     startup_id: str
-    posts: list[ManualPostInput]
+    posts: List[ManualPostInput]
 
 
 @router.post("/linkedin/import-posts")

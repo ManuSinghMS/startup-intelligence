@@ -88,7 +88,7 @@ def list_startups(
         conditions.append("tag = ?")
         params.append(tag)
     elif not include_inactive:
-        conditions.append("(tag IS NULL OR tag != 'not_active')")
+        conditions.append("(tag IS NULL OR (tag != 'not_active' AND tag != 'forge'))")
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 

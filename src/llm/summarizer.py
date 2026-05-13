@@ -5,6 +5,7 @@ Falls back to simple extraction if no API key is set.
 import os
 import json
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -170,30 +171,164 @@ async def company_summary(startup_id: str, days: int = 7) -> dict:
     }
 
 
+def _simple_digest(company_items: dict) -> list:
+    """Fallback: build simple per-company digest without LLM."""
+    result = []
+    for company, items in company_items.items():
+        key_updates = [i.get("title", "") for i in items[:3] if i.get("title")]
+        result.append({
+            "company": company,
+            "key_updates": key_updates,
+            "linkedin_activity": [],
+            "news_mentions": [],
+            "risks": [],
+            "opportunities": [],
+            "next_action": None,
+        })
+    return result
+
+
+async def generate_digest_llm(company_items: dict, days: int) -> list:
+    """Generate structured per-company digest via a single LLM call."""
+    if not company_items:
+        return []
+
+    try:
+        from src.llm.provider import get_llm_client, get_model_name, is_configured
+        if not is_configured():
+            return _simple_digest(company_items)
+
+        client = get_llm_client()
+        if not client:
+            return _simple_digest(company_items)
+
+        model = get_model_name()
+
+        companies_text = ""
+        for company, items in company_items.items():
+            companies_text += f"\n### {company}\n"
+            for item in items[:10]:
+                companies_text += (
+                    f"- [{item.get('classification', 'general')}] {item.get('title', '')}"
+                    f" ({item.get('source_name', '')}, {(item.get('published_at') or '')[:10]})"
+                    f": {(item.get('summary') or '')[:150]}\n"
+                )
+
+        prompt = f"""You are producing a startup portfolio intelligence digest for the past {days} days.
+
+For each company listed below, return a JSON object with these exact keys:
+- "company": company name string
+- "key_updates": array of 1-3 concise strings for the most important updates (empty array if none)
+- "linkedin_activity": array of strings about LinkedIn or founder/co-founder posts (empty array if none)
+- "news_mentions": array of strings about external news or web coverage (empty array if none)
+- "risks": array of strings about concerns or warning signs (empty array if none)
+- "opportunities": array of strings about growth or partnership opportunities (empty array if none)
+- "next_action": single recommended action string for the portfolio manager (null if nothing urgent)
+
+Return ONLY a valid JSON array — no markdown fences, no extra text.
+
+Companies and recent content:
+{companies_text}"""
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=3000,
+        )
+
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            parts = raw.split("```")
+            raw = parts[1] if len(parts) > 1 else raw
+            if raw.startswith("json"):
+                raw = raw[4:]
+        raw = raw.strip()
+
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            print(f"[Digest] LLM generated summaries for {len(parsed)} companies")
+            return parsed
+        return _simple_digest(company_items)
+
+    except Exception as e:
+        print(f"[Digest] LLM digest error: {e}")
+        return _simple_digest(company_items)
+
+
 async def weekly_digest(days: int = 7) -> dict:
-    """Generate a weekly digest across all startups."""
-    items = _get_content_for_period(None, days)
-
-    context = f"Portfolio Digest ({days} Days)"
-    summary_text = await generate_summary_llm(items, context)
-
+    """Generate (or replace) a portfolio digest for the given calendar period."""
     db = get_db()
-    summary_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
-    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    now = datetime.utcnow()
+    cutoff_dt = now - timedelta(days=days)
+    period_start = cutoff_dt.strftime("%Y-%m-%d")
+    period_end = now.strftime("%Y-%m-%d")
 
-    db.execute(
-        """INSERT INTO summaries (id, startup_id, summary_type, content, period_start, period_end)
-        VALUES (?, NULL, ?, ?, ?, ?)""",
-        (summary_id, "weekly_digest", summary_text, cutoff, now)
-    )
+    print(f"[Digest] Generating {days}-day digest: {period_start} → {period_end}")
+
+    # Fetch content for all active portfolio companies
+    rows = db.execute("""
+        SELECT ci.title, ci.summary, ci.classification, ci.source_name,
+               ci.published_at, ci.url, ci.source_type,
+               s.name as startup_name, s.id as startup_id
+        FROM content_items ci
+        JOIN startups s ON ci.startup_id = s.id
+        WHERE ci.published_at >= ? AND ci.is_relevant = 1
+          AND (s.tag IS NULL OR (s.tag != 'not_active' AND s.tag != 'forge'))
+        ORDER BY s.name, ci.published_at DESC
+        LIMIT 300
+    """, (cutoff_dt.isoformat(),)).fetchall()
+
+    items = [dict(r) for r in rows]
+    print(f"[Digest] Found {len(items)} content items across portfolio")
+
+    # Group by company
+    company_items: dict = defaultdict(list)
+    for item in items:
+        company_items[item["startup_name"]].append(item)
+
+    # Generate per-company summaries via LLM
+    companies = await generate_digest_llm(company_items, days)
+
+    # Store as JSON with metadata
+    content_obj = {"period_days": days, "companies": companies}
+    content_json = json.dumps(content_obj)
+
+    # Upsert: replace existing digest for the same calendar period
+    existing = db.execute(
+        """SELECT id FROM summaries
+           WHERE summary_type = 'weekly_digest' AND period_start = ? AND period_end = ?""",
+        (period_start, period_end)
+    ).fetchone()
+
+    now_iso = now.isoformat()
+    updated_existing = False
+    if existing:
+        db.execute(
+            "UPDATE summaries SET content = ?, created_at = ? WHERE id = ?",
+            (content_json, now_iso, existing["id"])
+        )
+        updated_existing = True
+        print(f"[Digest] Updated existing digest for {period_start} → {period_end}")
+    else:
+        summary_id = str(uuid.uuid4())
+        db.execute(
+            """INSERT INTO summaries (id, startup_id, summary_type, content, period_start, period_end)
+               VALUES (?, NULL, 'weekly_digest', ?, ?, ?)""",
+            (summary_id, content_json, period_start, period_end)
+        )
+        print(f"[Digest] Created new digest for {period_start} → {period_end}")
+
     db.commit()
 
     return {
-        "period": f"{days} days",
         "period_days": days,
+        "period_start": period_start,
+        "period_end": period_end,
         "items_count": len(items),
-        "summary": summary_text
+        "companies_count": len(companies),
+        "companies": companies,
+        "updated_existing": updated_existing,
     }
 
 

@@ -12,13 +12,14 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from typing import Set
 from dotenv import load_dotenv
 load_dotenv()
 
 from src.db.database import get_db
 
 
-def _table_columns(db, table: str) -> set[str]:
+def _table_columns(db, table: str) -> Set[str]:
     rows = db.execute(f"PRAGMA table_info({table})").fetchall()
     return {r[1] for r in rows}
 
@@ -211,6 +212,11 @@ def migrate():
             "sql": "CREATE INDEX IF NOT EXISTS idx_startups_tag ON startups(tag)",
             "desc": "Added index on startups.tag",
         },
+        {
+            "check": "SELECT * FROM sqlite_master WHERE type='index' AND name='idx_summaries_digest_period'",
+            "sql": "CREATE UNIQUE INDEX IF NOT EXISTS idx_summaries_digest_period ON summaries(summary_type, period_start, period_end) WHERE summary_type = 'weekly_digest'",
+            "desc": "Added unique index on summaries(summary_type, period_start, period_end) for weekly_digest",
+        },
     ]
 
     applied = 0
@@ -246,6 +252,29 @@ def migrate():
         db.commit()
     except Exception:
         pass
+
+    # Ensure The Forge McMaster catch-all entry exists
+    try:
+        exists = db.execute(
+            "SELECT id FROM startups WHERE id = 'the-forge-mcmaster'"
+        ).fetchone()
+        if not exists:
+            db.execute(
+                """INSERT INTO startups (id, name, description, tag)
+                   VALUES ('the-forge-mcmaster', 'The Forge McMaster',
+                   'McMaster University startup incubator — general news and announcements.',
+                   'forge')"""
+            )
+            db.commit()
+            print("  + Inserted 'The Forge McMaster' catch-all entry")
+        # Reassign existing unmatched Forge RSS items to the catch-all
+        db.execute(
+            """UPDATE content_items SET startup_id = 'the-forge-mcmaster'
+               WHERE startup_id IS NULL AND source_name = 'The Forge McMaster'"""
+        )
+        db.commit()
+    except Exception as e:
+        print(f"  ! Forge catch-all setup failed: {e}")
 
     print(f"Migration complete: {applied} changes applied")
 

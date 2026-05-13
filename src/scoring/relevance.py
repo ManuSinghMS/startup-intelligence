@@ -18,7 +18,7 @@ Fuzzy matching:
   - Handles "J. Smith" vs "John Smith" via last-name matching
   - Filters out very short names that cause false positives
 """
-from __future__ import annotations
+from typing import List, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ _COMPANY_SUFFIXES = [
 ]
 
 
-def _normalize_company(name: str) -> list[str]:
+def _normalize_company(name: str) -> List[str]:
     """
     Return a list of normalized company name variants to match against.
     E.g. "FooBar Inc." → ["foobar inc.", "foobar"]
@@ -49,7 +49,7 @@ def _normalize_company(name: str) -> list[str]:
     return variants
 
 
-def _parse_person_names(raw: str | None) -> list[str]:
+def _parse_person_names(raw: Optional[str]) -> List[str]:
     """
     Parse one or more person names from a raw string.
     Handles comma, semicolon, ampersand, and 'and' separators.
@@ -70,7 +70,7 @@ def _parse_person_names(raw: str | None) -> list[str]:
     return [raw] if len(raw) > 2 else []
 
 
-def _name_variants(full_name: str) -> list[str]:
+def _name_variants(full_name: str) -> List[str]:
     """
     Generate matching variants for a person name.
     "John Smith" → ["john smith", "smith", "j. smith", "j smith"]
@@ -102,11 +102,11 @@ def score_relevance(
     title: str,
     content: str,
     company_name: str,
-    legal_name: str | None = None,
-    founder_names: str | None = None,
-    cofounder_names: str | None = None,
-    contact_name: str | None = None,
-) -> tuple[bool, float]:
+    legal_name: Optional[str] = None,
+    founder_names: Optional[str] = None,
+    cofounder_names: Optional[str] = None,
+    contact_name: Optional[str] = None,
+) -> tuple:
     """
     Score how relevant an article is to a startup.
 

@@ -33,7 +33,7 @@ import hashlib
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List, Dict
 from urllib.parse import quote_plus, urlparse
 
 import feedparser
@@ -283,7 +283,7 @@ def is_valid_search_result(result: dict, role_prefix: str) -> tuple[bool, str, s
 # Founder / name helpers
 # ---------------------------------------------------------------------------
 
-def _get_search_names(startup: dict) -> list[dict]:
+def _get_search_names(startup: Dict) -> List[Dict]:
     names = []
     founder = (startup.get("founder_name") or "").strip()
     if founder:
@@ -332,7 +332,7 @@ def _extract_slug(linkedin_url: str, path_prefix: str = "company") -> Optional[s
 # Google News RSS search
 # ---------------------------------------------------------------------------
 
-async def _search_google_news(query: str, timeout: float = 20.0) -> list[dict]:
+async def _search_google_news(query: str, timeout: float = 20.0) -> List[Dict]:
     global _request_count
     _request_count += 1
     encoded = quote_plus(query)
@@ -413,7 +413,7 @@ async def _discover_company_url(company_name: str) -> Optional[str]:
 # Post Ingestion
 # ---------------------------------------------------------------------------
 
-async def _search_posts(query: str, checkpoint: Optional[str] = None) -> list[dict]:
+async def _search_posts(query: str, checkpoint: Optional[str] = None) -> List[Dict]:
     results = await _search_google_news(query)
     if checkpoint:
         results = [r for r in results if _is_after_checkpoint(r["published_at"], checkpoint)]
@@ -475,7 +475,7 @@ def _store_content_item(
     published_at: str,
     raw_content: str,
     external_source: str,
-    extra_metadata: dict | None = None,
+    extra_metadata: Optional[Dict] = None,
 ) -> tuple[bool, str]:
     """
     Insert a LinkedIn URL-only content item with full field population.
@@ -769,7 +769,7 @@ async def ingest_all_companies(
 
     return results
 
-def parse_url_field(raw: str | None) -> list[str]:
+def parse_url_field(raw: Optional[str]) -> List[str]:
     """Parse a Monday/CSV cell containing one or many URLs.
     Splits on newlines, commas, semicolons, and whitespace; dedupes.
     """
@@ -798,7 +798,7 @@ _STORABLE_AS_CONTENT = (
 )
 
 
-def import_manual_posts(startup_id: str, posts: list[dict], startup_name: str = "Unknown") -> dict:
+def import_manual_posts(startup_id: str, posts: List[Dict], startup_name: str = "Unknown") -> Dict:
     """Manually import LinkedIn post URLs via API, Monday sync, or CSV.
 
     Each `posts` entry is a dict with at least `url`. Optional:
