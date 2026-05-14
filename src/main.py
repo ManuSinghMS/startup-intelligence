@@ -29,6 +29,16 @@ async def lifespan(app: FastAPI):
     # Then initialize (runs CREATE TABLE IF NOT EXISTS for new installs)
     init_db()
 
+    # First-boot source seeding. Idempotent: only inserts when the
+    # sources table is empty, so re-deploys don't duplicate rows.
+    try:
+        from src.db.database import get_db
+        if get_db().execute("SELECT COUNT(*) FROM sources").fetchone()[0] == 0:
+            from src.db.seed import seed_sources
+            seed_sources()
+    except Exception as e:
+        print(f"Source seed (non-critical): {e}")
+
     print("Startup Intelligence Platform is ready!")
 
     # Start scheduler (optional)
