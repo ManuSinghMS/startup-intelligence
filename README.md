@@ -1,5 +1,8 @@
 # Startup Intelligence Platform
 
+> **New to this project? Start with [HANDOFF.md](HANDOFF.md).** It tells you
+> what to do first, in what order, and which doc answers which question.
+
 A small FastAPI application that tracks news, social posts, and newsletter
 mentions for portfolio companies (built for The Forge incubator at McMaster
 University). Ingests from Google News, RSS, Monday.com, and Gmail; uses an
