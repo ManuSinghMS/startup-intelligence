@@ -243,6 +243,67 @@ def get_ingestion_logs():
     return {"lines": list(_log_buffer)}
 
 
+@router.post("/ingest/recheck-relevance")
+async def recheck_relevance(limit: int = 100, max_score: float = 0.6):
+    """
+    Retroactively re-verify already-stored content items against their
+    startup using the LLM relevance check. Items the LLM rejects are
+    deleted; items kept are flagged is_relevant=1.
+
+    Use this after a pipeline tuning change to clean out false positives
+    that slipped through earlier ingests.
+
+    Query params:
+      limit:     max items to inspect this call (default 100)
+      max_score: only inspect items with confidence_score <= this (default 0.6).
+                 0.50 covers all company-name-only matches; bump to 1.0 to
+                 inspect everything.
+    """
+    from src.ingestion.company_search import verify_relevance_with_llm
+
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT ci.id, ci.title, ci.raw_content, ci.confidence_score,
+               s.id as sid, s.name as sname, s.legal_name, s.description,
+               s.industry, s.website
+        FROM content_items ci
+        JOIN startups s ON s.id = ci.startup_id
+        WHERE ci.source_type IN ('news', 'blog')
+          AND COALESCE(ci.confidence_score, 0.5) <= ?
+        ORDER BY ci.confidence_score ASC, ci.created_at DESC
+        LIMIT ?
+        """,
+        (max_score, limit),
+    ).fetchall()
+
+    stats = {"inspected": 0, "deleted": 0, "kept": 0, "errors": 0, "rejected_examples": []}
+    for r in rows:
+        stats["inspected"] += 1
+        startup = {
+            "id": r["sid"], "name": r["sname"], "legal_name": r["legal_name"],
+            "description": r["description"], "industry": r["industry"],
+            "website": r["website"],
+        }
+        try:
+            ok = await verify_relevance_with_llm(r["title"] or "", r["raw_content"] or "", startup)
+            if not ok:
+                db.execute("DELETE FROM content_items WHERE id = ?", (r["id"],))
+                stats["deleted"] += 1
+                if len(stats["rejected_examples"]) < 20:
+                    stats["rejected_examples"].append({
+                        "company": r["sname"],
+                        "title": (r["title"] or "")[:120],
+                    })
+            else:
+                stats["kept"] += 1
+        except Exception as e:
+            print(f"[Recheck] error on {r['id']}: {e}")
+            stats["errors"] += 1
+    db.commit()
+    return stats
+
+
 @router.post("/ingest/forge-feed")
 async def ingest_forge_feed():
     """

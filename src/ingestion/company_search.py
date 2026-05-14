@@ -376,6 +376,11 @@ async def ingest_for_company(startup: dict, max_items: int = 8, fast: bool = Tru
     db = get_db()
     stats = {"found": 0, "new": 0, "duplicate": 0, "filtered": 0, "new_item_ids": []}
 
+    # Cap LLM relevance verifications per company to keep the per-company
+    # time budget bounded (matters under the Fly.io trial 5-minute window).
+    MAX_LLM_VERIFIES_PER_COMPANY = 5
+    llm_verifications_used = 0
+
     name = startup["name"]
     legal_name = startup.get("legal_name", "")
 
@@ -432,34 +437,53 @@ async def ingest_for_company(startup: dict, max_items: int = 8, fast: bool = Tru
             else:
                 source_name = "Google News"
 
-            # RELEVANCE CHECK: Only keep if company name actually appears
+            # RELEVANCE CHECK — score on real founder fields, not the
+            # contact (which is usually a Forge admin).
             relevant, confidence = is_relevant_result(
                 title, content, name, legal_name,
-                founder_names=startup.get("contact_name", "")
+                founder_names=startup.get("founder_name", ""),
+                cofounder_names=startup.get("cofounder_name", ""),
             )
             if not relevant:
                 stats["filtered"] += 1
                 continue
 
-            # Skip low confidence results for generic company names
-            if confidence < 0.5 and len(name_words) <= 2:
-                stats["filtered"] += 1
-                continue
+            # Whether any founder/co-founder name was actually matched.
+            # founder-in-body=0.70+, founder-in-title=0.90+; a company-only
+            # match maxes at 0.50.
+            has_founder_match = confidence >= 0.60
 
-            # LLM VERIFICATION: only run in slow/precise mode — too slow for trial runs.
-            if not fast and (len(name_words) <= 3 or confidence < 0.8):
-                llm_relevant = await verify_relevance_with_llm(
-                    title, content, startup
-                )
-                if not llm_relevant:
-                    stats["filtered"] += 1
-                    print(f"    [LLM FILTER] Rejected: '{title[:60]}...' for {name}")
-                    continue
-            elif fast and confidence < 0.45:
-                # In fast mode, raise the scoring bar a bit to compensate
-                # for skipping the LLM verifier.
-                stats["filtered"] += 1
-                continue
+            # LLM VERIFICATION — required (within budget) for the high
+            # false-positive cases. Short generic company names like
+            # "Blue Orchid" or "Take Care" match unrelated nightclubs and
+            # restaurants if we only rely on string scoring, so we let
+            # the LLM see the Forge context and decide.
+            needs_llm_verify = (
+                (not has_founder_match and len(name_words) <= 2) or
+                (confidence < 0.7 and len(name_words) <= 3)
+            )
+            if not fast:
+                # Precise mode: verify a bit more aggressively.
+                needs_llm_verify = needs_llm_verify or len(name_words) <= 3 or confidence < 0.8
+
+            if needs_llm_verify:
+                if llm_verifications_used < MAX_LLM_VERIFIES_PER_COMPANY:
+                    llm_relevant = await verify_relevance_with_llm(
+                        title, content, startup
+                    )
+                    llm_verifications_used += 1
+                    if not llm_relevant:
+                        stats["filtered"] += 1
+                        print(f"    [LLM FILTER] Rejected: '{title[:60]}...' for {name}")
+                        continue
+                else:
+                    # Out of LLM-verify budget. For generic short names
+                    # with no founder signal, drop conservatively rather
+                    # than risk a false positive.
+                    if not has_founder_match and len(name_words) <= 2:
+                        stats["filtered"] += 1
+                        print(f"    [LLM BUDGET] Dropped (cap): '{title[:60]}...' for {name}")
+                        continue
 
             # Dedup check
             content_hash = hash_content(url, title)
