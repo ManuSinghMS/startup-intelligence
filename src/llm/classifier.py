@@ -110,34 +110,49 @@ async def classify_with_llm(title: str, content: str) -> dict:
         model = get_model_name()
         provider = get_provider()
 
+        # Trim content harder than before — Groq's free TPM is the real
+        # bottleneck, and the model classifies fine on 600 chars of body.
+        snippet = (content or "")[:600]
         prompt = f"""Analyze this startup news article and return a JSON object with:
 1. "classification": one of {json.dumps(CATEGORIES)}
 2. "sentiment": one of ["positive", "neutral", "negative"]
-3. "topics": array of 2-5 relevant topic tags (lowercase)
-4. "summary": a concise 2-3 sentence summary of the key points
-5. "hired_count": integer representing the number of people hired, appointed, or joined (0 if none mentioned)
+3. "topics": array of 2-4 short topic tags (lowercase)
+4. "summary": concise 1-2 sentence summary
+5. "hired_count": integer (number of people hired/appointed/joined; 0 if none)
 
 Title: {title}
-Content: {content[:1000]}
+Content: {snippet}
 
 Return ONLY valid JSON, no other text."""
 
+        from src.llm.provider import call_with_retry
+        # Rough token estimate: prompt ~250 + snippet ~200 + output ~250.
+        est_tokens = 500 + min(len(snippet), 600) // 3
+
         # Groq's JSON mode is finicky for some llama models — try with
-        # response_format first, fall back without it on errors.
+        # response_format first, fall back without it on schema errors.
         kwargs = dict(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
-            max_tokens=500,
+            max_tokens=300,
         )
         try:
-            response = await client.chat.completions.create(
-                **kwargs, response_format={"type": "json_object"}
+            response = await call_with_retry(
+                lambda: client.chat.completions.create(
+                    **kwargs, response_format={"type": "json_object"}
+                ),
+                estimated_tokens=est_tokens,
             )
         except Exception as e:
             msg = str(e).lower()
-            if "response_format" in msg or "json" in msg or "unsupported" in msg:
-                response = await client.chat.completions.create(**kwargs)
+            if "response_format" in msg or "unsupported" in msg or (
+                "json" in msg and "rate" not in msg
+            ):
+                response = await call_with_retry(
+                    lambda: client.chat.completions.create(**kwargs),
+                    estimated_tokens=est_tokens,
+                )
             else:
                 raise
 

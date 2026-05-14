@@ -337,11 +337,18 @@ Think carefully:
 
 Reply with ONLY a JSON object: {{"relevant": true}} or {{"relevant": false}}"""
 
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-            max_tokens=50,
+        from src.llm.provider import call_with_retry
+        # Verifier prompt is ~300 tokens (company info + 800-char snippet)
+        # plus up to 50 output tokens.
+        est_tokens = 400 + min(len(content), 800) // 3
+        response = await call_with_retry(
+            lambda: client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+                max_tokens=50,
+            ),
+            estimated_tokens=est_tokens,
         )
 
         result_text = response.choices[0].message.content.strip()
@@ -376,9 +383,11 @@ async def ingest_for_company(startup: dict, max_items: int = 8, fast: bool = Tru
     db = get_db()
     stats = {"found": 0, "new": 0, "duplicate": 0, "filtered": 0, "new_item_ids": []}
 
-    # Cap LLM relevance verifications per company to keep the per-company
-    # time budget bounded (matters under the Fly.io trial 5-minute window).
-    MAX_LLM_VERIFIES_PER_COMPANY = 5
+    # Cap LLM relevance verifications per company. Each verify is a Groq
+    # call (~400 tokens), classification is another ~1000. With Groq's
+    # 6000 TPM free-tier cap shared across both, 3 verifies + 5 classifies
+    # per company keeps us safely under the limit.
+    MAX_LLM_VERIFIES_PER_COMPANY = 3
     llm_verifications_used = 0
 
     name = startup["name"]
