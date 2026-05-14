@@ -204,6 +204,10 @@ async def generate_digest_llm(company_items: dict, days: int) -> list:
 
         model = get_model_name()
 
+        real_company_names = list(company_items.keys())
+        # Build a name -> canonical-name map for validation (lower, stripped).
+        canonical = {n.strip().lower(): n for n in real_company_names}
+
         companies_text = ""
         for company, items in company_items.items():
             companies_text += f"\n### {company}\n"
@@ -216,8 +220,13 @@ async def generate_digest_llm(company_items: dict, days: int) -> list:
 
         prompt = f"""You are producing a startup portfolio intelligence digest for the past {days} days.
 
-For each company listed below, return a JSON object with these exact keys:
-- "company": company name string
+Return a JSON array with EXACTLY {len(real_company_names)} objects — one per
+company in the list below, in the same order, using the EXACT company name
+strings shown. Do NOT invent placeholder entries like "Company 2",
+"Company 3", or any company name that is not in the list.
+
+Each object must have these keys:
+- "company": company name string (must match one of: {json.dumps(real_company_names)})
 - "key_updates": array of 1-3 concise strings for the most important updates (empty array if none)
 - "linkedin_activity": array of strings about LinkedIn or founder/co-founder posts (empty array if none)
 - "news_mentions": array of strings about external news or web coverage (empty array if none)
@@ -230,11 +239,17 @@ Return ONLY a valid JSON array — no markdown fences, no extra text.
 Companies and recent content:
 {companies_text}"""
 
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=3000,
+        from src.llm.provider import call_with_retry
+        # Rough estimate: prompt ~600 + content body ~500 per company + output ~400 per company
+        est_tokens = 1000 + len(real_company_names) * 800
+        response = await call_with_retry(
+            lambda: client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=3000,
+            ),
+            estimated_tokens=est_tokens,
         )
 
         raw = response.choices[0].message.content.strip()
@@ -246,10 +261,30 @@ Companies and recent content:
         raw = raw.strip()
 
         parsed = json.loads(raw)
-        if isinstance(parsed, list):
-            print(f"[Digest] LLM generated summaries for {len(parsed)} companies")
-            return parsed
-        return _simple_digest(company_items)
+        if not isinstance(parsed, list):
+            return _simple_digest(company_items)
+
+        # Drop hallucinated placeholders. Only keep entries whose "company"
+        # matches an actual portfolio company name (case-insensitive).
+        # Canonicalize the name so downstream renders show the exact string.
+        cleaned = []
+        seen = set()
+        for obj in parsed:
+            if not isinstance(obj, dict):
+                continue
+            name = (obj.get("company") or "").strip()
+            real = canonical.get(name.lower())
+            if not real or real in seen:
+                continue
+            obj["company"] = real
+            cleaned.append(obj)
+            seen.add(real)
+
+        dropped = len(parsed) - len(cleaned)
+        if dropped > 0:
+            print(f"[Digest] Dropped {dropped} hallucinated/duplicate entries from LLM output")
+        print(f"[Digest] LLM generated summaries for {len(cleaned)} real companies")
+        return cleaned
 
     except Exception as e:
         print(f"[Digest] LLM digest error: {e}")
