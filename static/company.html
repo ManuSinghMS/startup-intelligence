@@ -1,68 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Company Profile — Startup Intelligence</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Company Profile — Startup Intelligence</title>
+ <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
 <div class="app">
-    <header class="header">
-        <div class="header-inner">
-            <a href="/" class="logo">
-                <div class="logo-icon">⚡</div>
-                <div class="logo-text">Startup <span>Intel</span></div>
-            </a>
-            <nav class="header-nav">
-                <a href="/" class="nav-btn">← Back to Dashboard</a>
-                <button class="nav-btn primary" onclick="generateSummary(7)">📊 7-Day Summary</button>
-                <button class="nav-btn" onclick="generateSummary(30)">📊 30-Day Summary</button>
-                <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" title="Toggle light/dark mode">🌙</button>
-            </nav>
-        </div>
-    </header>
+ <header class="header">
+ <div class="header-inner">
+ <a href="/" class="logo">
+ <div class="logo-icon"></div>
+ <div class="logo-text">Startup <span>Intel</span></div>
+ </a>
+ <nav class="header-nav">
+ <a href="/" class="nav-btn">← Back to Dashboard</a>
+ <button class="nav-btn primary" onclick="generateSummary(7)"> 7-Day Summary</button>
+ <button class="nav-btn" onclick="generateSummary(30)"> 30-Day Summary</button>
+ <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" title="Toggle light/dark mode"></button>
+ </nav>
+ </div>
+ </header>
 
-    <div class="main" style="grid-template-columns: 1fr; max-width: 1100px;">
-        <!-- Company Header -->
-        <div id="company-header">
-            <div class="loading">
-                <div class="spinner"></div>
-                <span>Loading company...</span>
-            </div>
-        </div>
+ <div class="main" style="grid-template-columns: 1fr; max-width: 1100px;">
+ <!-- Company Header -->
+ <div id="company-header">
+ <div class="loading">
+ <div class="spinner"></div>
+ <span>Loading company...</span>
+ </div>
+ </div>
 
-        <!-- Tabs -->
-        <div class="tabs" id="company-tabs">
-            <button class="tab-btn active" onclick="switchTab('timeline')">📰 Content Timeline</button>
-            <button class="tab-btn" onclick="switchTab('summary')">📊 AI Summary</button>
-            <button class="tab-btn" onclick="switchTab('stats')">📈 Stats</button>
-        </div>
+ <!-- Tabs -->
+ <div class="tabs" id="company-tabs">
+ <button class="tab-btn active" onclick="switchTab('timeline')">Content Timeline</button>
+ <button class="tab-btn" onclick="switchTab('summary')">AI Summary</button>
+ <button class="tab-btn" onclick="switchTab('stats')">Stats</button>
+ </div>
 
-        <!-- Timeline Tab -->
-        <div id="tab-timeline">
-            <div class="content-feed" id="company-content">
-                <div class="loading"><div class="spinner"></div><span>Loading content...</span></div>
-            </div>
-        </div>
+ <!-- Timeline Tab -->
+ <div id="tab-timeline">
+ <div class="content-feed" id="company-content">
+ <div class="loading"><div class="spinner"></div><span>Loading content...</span></div>
+ </div>
+ </div>
 
-        <!-- Summary Tab -->
-        <div id="tab-summary" style="display:none;">
-            <div id="summary-content">
-                <div class="empty-state">
-                    <div class="icon">📊</div>
-                    <h3>No summary generated yet</h3>
-                    <p>Click "7-Day Summary" or "30-Day Summary" to generate an AI-powered brief.</p>
-                </div>
-            </div>
-        </div>
+ <!-- Summary Tab -->
+ <div id="tab-summary" style="display:none;">
+ <div id="summary-content">
+ <div class="empty-state">
+ <div class="icon"></div>
+ <h3>No summary generated yet</h3>
+ <p>Click "7-Day Summary" or "30-Day Summary" to generate an AI-powered brief.</p>
+ </div>
+ </div>
+ </div>
 
-        <!-- Stats Tab -->
-        <div id="tab-stats" style="display:none;">
-            <div class="stats-grid" id="company-stats-grid" style="grid-template-columns: repeat(3, 1fr);"></div>
-            <div id="company-stats-detail"></div>
-        </div>
-    </div>
+ <!-- Stats Tab -->
+ <div id="tab-stats" style="display:none;">
+ <div class="stats-grid" id="company-stats-grid" style="grid-template-columns: repeat(3, 1fr);"></div>
+ <div id="company-stats-detail"></div>
+ </div>
+ </div>
 </div>
 
 <div class="toast-container" id="toast-container"></div>

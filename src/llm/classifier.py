@@ -3,7 +3,6 @@ LLM-powered content classifier.
 Uses OpenAI API to classify content into categories.
 Falls back to keyword-based classification if no API key is set.
 """
-import os
 import json
 from typing import Optional
 
@@ -50,37 +49,66 @@ def classify_by_keywords(text: str) -> str:
     return "general"
 
 
+def _keyword_fallback(title: str, content: str) -> dict:
+    text = f"{title} {content}"
+    return {
+        "classification": classify_by_keywords(text),
+        "sentiment": "neutral",
+        "topics": [],
+        "summary": content[:300] + "..." if len(content) > 300 else content,
+        "hired_count": 0,
+    }
+
+
+def _extract_json(text: str) -> Optional[dict]:
+    """Best-effort JSON extraction from an LLM response.
+
+    LLMs sometimes return the JSON wrapped in prose, in a ```json block,
+    or with trailing commentary. We try a strict json.loads first, then
+    a substring slice between the first '{' and last '}'.
+    """
+    if not text:
+        return None
+    text = text.strip()
+    # Strip code fences if present
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            return json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
 async def classify_with_llm(title: str, content: str) -> dict:
     """
     Classify content using the configured LLM provider.
     Returns dict with classification, sentiment, topics, and summary.
+
+    Falls back to keyword classification on any failure so items never
+    get stuck as 'unclassified'.
     """
     try:
-        from src.llm.provider import get_llm_client, get_model_name, is_configured
+        from src.llm.provider import get_llm_client, get_model_name, is_configured, get_provider
         if not is_configured():
-            text = f"{title} {content}"
-            return {
-                "classification": classify_by_keywords(text),
-                "sentiment": "neutral",
-                "topics": [],
-                "summary": content[:300] + "..." if len(content) > 300 else content,
-                "hired_count": 0
-            }
+            return _keyword_fallback(title, content)
 
         client = get_llm_client()
         if not client:
-            text = f"{title} {content}"
-            return {
-                "classification": classify_by_keywords(text),
-                "sentiment": "neutral",
-                "topics": [],
-                "summary": content[:300] + "..." if len(content) > 300 else content,
-                "hired_count": 0
-            }
+            return _keyword_fallback(title, content)
 
         model = get_model_name()
-
-
+        provider = get_provider()
 
         prompt = f"""Analyze this startup news article and return a JSON object with:
 1. "classification": one of {json.dumps(CATEGORIES)}
@@ -94,15 +122,30 @@ Content: {content[:1000]}
 
 Return ONLY valid JSON, no other text."""
 
-        response = await client.chat.completions.create(
+        # Groq's JSON mode is finicky for some llama models — try with
+        # response_format first, fall back without it on errors.
+        kwargs = dict(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=500,
-            response_format={"type": "json_object"}
         )
+        try:
+            response = await client.chat.completions.create(
+                **kwargs, response_format={"type": "json_object"}
+            )
+        except Exception as e:
+            msg = str(e).lower()
+            if "response_format" in msg or "json" in msg or "unsupported" in msg:
+                response = await client.chat.completions.create(**kwargs)
+            else:
+                raise
 
-        result = json.loads(response.choices[0].message.content)
+        raw = response.choices[0].message.content
+        result = _extract_json(raw)
+        if not result:
+            print(f"LLM returned unparseable response: {raw[:200]!r}")
+            return _keyword_fallback(title, content)
 
         # Validate classification
         if result.get("classification") not in CATEGORIES:
@@ -110,20 +153,20 @@ Return ONLY valid JSON, no other text."""
         if result.get("sentiment") not in ["positive", "neutral", "negative"]:
             result["sentiment"] = "neutral"
         if not isinstance(result.get("hired_count"), int):
-            result["hired_count"] = 0
+            try:
+                result["hired_count"] = int(result.get("hired_count", 0) or 0)
+            except (TypeError, ValueError):
+                result["hired_count"] = 0
+        if not isinstance(result.get("topics"), list):
+            result["topics"] = []
+        if not isinstance(result.get("summary"), str):
+            result["summary"] = ""
 
         return result
 
     except Exception as e:
         print(f"LLM classification error: {e}")
-        text = f"{title} {content}"
-        return {
-            "classification": classify_by_keywords(text),
-            "sentiment": "neutral",
-            "topics": [],
-            "summary": content[:300] + "..." if len(content) > 300 else content,
-            "hired_count": 0
-        }
+        return _keyword_fallback(title, content)
 
 
 async def classify_content_item(content_id: str) -> dict:

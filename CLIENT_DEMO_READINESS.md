@@ -36,17 +36,17 @@ articles) **or** a LinkedIn URL kind (for URL-only LinkedIn items):
 
 | URL kind                  | What it is                                                  | Stored as content? |
 |---------------------------|-------------------------------------------------------------|--------------------|
-| `founder_post_url`        | `linkedin.com/posts/...`, `/feed/update/...`, `/pulse/...` | ✅ yes              |
-| `cofounder_post_url`      | same, attributed to a co-founder                            | ✅ yes              |
-| `company_post_url`        | same, on a company page                                     | ✅ yes              |
-| `founder_activity_page`   | `linkedin.com/in/<slug>/recent-activity/`                   | ✅ yes (separate)   |
-| `cofounder_activity_page` | same, co-founder                                            | ✅ yes              |
-| `company_activity_page`   | `linkedin.com/company/<slug>/posts/`                        | ✅ yes              |
-| `founder_profile_url`     | `linkedin.com/in/<slug>` (bare profile)                     | ❌ no — updates `founder_linkedin_url` instead |
-| `cofounder_profile_url`   | same, co-founder                                            | ❌ no — updates startup row |
-| `company_page_url`        | `linkedin.com/company/<slug>` (bare page)                   | ❌ no — updates startup row |
-| `news_mention`            | News article that explicitly references a LinkedIn post     | ✅ yes              |
-| `web_mention`             | Other web reference (reserved)                              | ✅ yes              |
+| `founder_post_url`        | `linkedin.com/posts/...`, `/feed/update/...`, `/pulse/...` |  yes              |
+| `cofounder_post_url`      | same, attributed to a co-founder                            |  yes              |
+| `company_post_url`        | same, on a company page                                     |  yes              |
+| `founder_activity_page`   | `linkedin.com/in/<slug>/recent-activity/`                   |  yes (separate)   |
+| `cofounder_activity_page` | same, co-founder                                            |  yes              |
+| `company_activity_page`   | `linkedin.com/company/<slug>/posts/`                        |  yes              |
+| `founder_profile_url`     | `linkedin.com/in/<slug>` (bare profile)                     |  no — updates `founder_linkedin_url` instead |
+| `cofounder_profile_url`   | same, co-founder                                            |  no — updates startup row |
+| `company_page_url`        | `linkedin.com/company/<slug>` (bare page)                   |  no — updates startup row |
+| `news_mention`            | News article that explicitly references a LinkedIn post     |  yes              |
+| `web_mention`             | Other web reference (reserved)                              |  yes              |
 
 URL-only items have `ingestion_status='url_only'`. The dashboard renders them
 with a clear "Open LinkedIn Post" button and never claims the post text was
@@ -89,7 +89,7 @@ python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 # open http://localhost:8000
 ```
 
-URL-only LinkedIn items appear with a blue left border, a clear "🔗 Open
+URL-only LinkedIn items appear with a blue left border, a clear " Open
 LinkedIn Post" CTA, and the role attribution (`founder` / `cofounder` /
 `company`).
 
@@ -116,13 +116,13 @@ LinkedIn Post" CTA, and the role attribution (`founder` / `cofounder` /
 
 ## Constraints we honor (deliberately)
 
-- ✅ No paid LinkedIn APIs, Phantombuster, Clay, Sales Navigator exporters,
+-  No paid LinkedIn APIs, Phantombuster, Clay, Sales Navigator exporters,
   or paid proxies.
-- ✅ No aggressive scraping, IP rotation, or "stay-under-the-radar" tactics.
-- ✅ No scraping Sales Navigator pages — Sales Navigator is treated as a
+-  No aggressive scraping, IP rotation, or "stay-under-the-radar" tactics.
+-  No scraping Sales Navigator pages — Sales Navigator is treated as a
   human-assisted research console; URLs are pasted into Monday.
-- ✅ No storing generic profile pages or search-result pages as posts.
-- ✅ No labeling of Google News results as LinkedIn posts unless the URL
+-  No storing generic profile pages or search-result pages as posts.
+-  No labeling of Google News results as LinkedIn posts unless the URL
   itself is a LinkedIn post URL.
 
 ---

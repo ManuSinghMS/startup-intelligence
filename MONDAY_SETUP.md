@@ -186,16 +186,16 @@ View board structure and current column mapping.
 
 ## FAQ
 
-**Q: Does it delete companies?**  
+**Q: Does it delete companies?**
 No — sync only creates or updates. Removed companies stay in the database.
 
-**Q: What if a field is empty?**  
+**Q: What if a field is empty?**
 Empty values are skipped. Existing database values aren't overwritten with blanks.
 
-**Q: How often should I sync?**  
+**Q: How often should I sync?**
 Depends on your needs. Hourly is common for active boards. Dry-run shows what would change.
 
-**Q: Can I sync only certain companies?**  
+**Q: Can I sync only certain companies?**
 Currently syncs the entire board. Filter by status in Monday.com if needed.
 
 ## For Developers

@@ -363,13 +363,18 @@ Reply with ONLY a JSON object: {{"relevant": true}} or {{"relevant": false}}"""
         return True  # Fallback: allow the article through
 
 
-async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
+async def ingest_for_company(startup: dict, max_items: int = 8, fast: bool = True) -> dict:
     """
     Search Google News for a specific company and store results.
     Only keeps results that genuinely mention the company name.
+
+    fast=True (default for Fly.io trial / time-constrained runs):
+      - Skips LLM relevance verification (relies on scoring)
+      - Skips website scraping
+      - Limits to one Google News query per company
     """
     db = get_db()
-    stats = {"found": 0, "new": 0, "duplicate": 0, "filtered": 0}
+    stats = {"found": 0, "new": 0, "duplicate": 0, "filtered": 0, "new_item_ids": []}
 
     name = startup["name"]
     legal_name = startup.get("legal_name", "")
@@ -404,7 +409,10 @@ async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
             desc_context = " OR ".join(f'"{w}"' for w in desc_words[:3])
             search_queries = [f'"{name}" ({desc_context} {forge_context})']
 
-    for query in search_queries:
+    # In fast mode, only use the first (most targeted) query to save time
+    queries_to_run = search_queries[:1] if fast else search_queries
+
+    for query in queries_to_run:
         feed = await search_google_news(query)
         if not feed or not feed.entries:
             continue
@@ -438,9 +446,8 @@ async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
                 stats["filtered"] += 1
                 continue
 
-            # LLM VERIFICATION: For borderline or generic-name companies,
-            # ask the LLM to verify the article is about this specific company
-            if len(name_words) <= 3 or confidence < 0.8:
+            # LLM VERIFICATION: only run in slow/precise mode — too slow for trial runs.
+            if not fast and (len(name_words) <= 3 or confidence < 0.8):
                 llm_relevant = await verify_relevance_with_llm(
                     title, content, startup
                 )
@@ -448,6 +455,11 @@ async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
                     stats["filtered"] += 1
                     print(f"    [LLM FILTER] Rejected: '{title[:60]}...' for {name}")
                     continue
+            elif fast and confidence < 0.45:
+                # In fast mode, raise the scoring bar a bit to compensate
+                # for skipping the LLM verifier.
+                stats["filtered"] += 1
+                continue
 
             # Dedup check
             content_hash = hash_content(url, title)
@@ -472,10 +484,11 @@ async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
                  confidence)
             )
             stats["new"] += 1
+            stats["new_item_ids"].append(item_id)
 
-    # Direct website scraping
+    # Direct website scraping — skipped in fast mode (slow, error-prone on Fly.io trial)
     website = startup.get("website", "")
-    if website:
+    if website and not fast:
         try:
             print(f"  [{name}] Scraping website: {website}")
             item_id = await scrape_and_store(website, source_name=f"{name} Website", source_type="blog")
@@ -583,9 +596,15 @@ async def ingest_for_company(startup: dict, max_items: int = 20) -> dict:
     return stats
 
 
-async def _run_ingestion(startups: list) -> list:
+async def _run_ingestion(startups: list, progress: Optional[dict] = None) -> list:
     """
     Internal helper — run company-specific news search for a list of startups.
+
+    Per-company flow (tuned to fit a Fly.io trial 5-minute window):
+      1. Fast Google News ingest for the company
+      2. Immediately classify the company's new items (so partial work survives
+         even if the machine is killed by Fly's trial timeout)
+      3. Stamp last_ingested_at and update the progress dict
     """
     db = get_db()
     results = []
@@ -599,18 +618,46 @@ async def _run_ingestion(startups: list) -> list:
 
     total_new = 0
     total_found = 0
+    total_classified = 0
 
-    for startup in startups:
+    for idx, startup in enumerate(startups):
+        if progress is not None:
+            progress["current_company"] = startup["name"]
+            progress["completed"] = idx
+            progress["total"] = len(startups)
+
         try:
-            stats = await ingest_for_company(startup)
+            stats = await ingest_for_company(startup, fast=True)
             total_new += stats["new"]
             total_found += stats["found"]
+
+            # Per-company classification — catches up the items just inserted.
+            # Doing this inline (instead of in one big batch at the end) means
+            # if the Fly.io trial kills the machine mid-batch, every company
+            # we've already processed is fully classified, not stuck in
+            # 'unclassified' limbo.
+            classified_here = 0
+            if stats["new_item_ids"]:
+                try:
+                    from src.llm.classifier import classify_content_item
+                    for item_id in stats["new_item_ids"]:
+                        try:
+                            await classify_content_item(item_id)
+                            classified_here += 1
+                        except Exception as ce:
+                            print(f"    [Classify] {item_id} error: {ce}")
+                except Exception as e:
+                    print(f"  [Classify import] {e}")
+            total_classified += classified_here
+
             results.append({
                 "startup": startup["name"],
-                **stats
+                **{k: v for k, v in stats.items() if k != "new_item_ids"},
+                "classified": classified_here,
             })
             print(f"  [{startup['name']}] found={stats['found']}, "
-                  f"new={stats['new']}, dupes={stats['duplicate']}")
+                  f"new={stats['new']}, classified={classified_here}, "
+                  f"dupes={stats['duplicate']}")
         except Exception as e:
             print(f"  [{startup['name']}] Error: {e}")
             results.append({
@@ -624,11 +671,15 @@ async def _run_ingestion(startups: list) -> list:
             (startup["id"],)
         )
         db.commit()
-            
-        import asyncio
-        # Prevent hitting LLM rate limits by spacing out bulk ingestion
-        print(f"  [System] Pausing for 5 seconds to respect API rate limits...")
-        await asyncio.sleep(5.0)
+
+        if progress is not None:
+            progress["completed"] = idx + 1
+            progress["new_items"] = total_new
+            progress["classified"] = total_classified
+
+        # Small breather between companies — keeps us well under Groq's
+        # free-tier RPM ceiling without burning the 5-minute Fly trial budget.
+        await asyncio.sleep(0.5)
 
     # Update log
     db.execute(
@@ -640,45 +691,42 @@ async def _run_ingestion(startups: list) -> list:
     )
     db.commit()
 
+    if progress is not None:
+        progress["status"] = "completed"
+        progress["finished_at"] = datetime.utcnow().isoformat()
+
     return results
 
 
-async def ingest_all_companies(limit: int = 20) -> list:
+DEFAULT_BATCH_LIMIT = int(os.environ.get("INGEST_BATCH_LIMIT", "25"))
+
+
+async def ingest_all_companies(limit: int = DEFAULT_BATCH_LIMIT,
+                               progress: Optional[dict] = None) -> list:
     """
     Run ingestion for a rolling batch of companies.
     Selects the `limit` number of companies with the oldest `last_ingested_at`
     timestamps, processes them, and updates their timestamps.
+
+    The Forge RSS feed is intentionally skipped here because it is slow and
+    eats into the 5-minute Fly.io trial budget. Run it separately via
+    POST /api/ingest/forge-feed when needed.
     """
     db = get_db()
-    
-    # 1. First, globally fetch The Forge's own RSS feed to ensure no incubator articles are missed by Google!
-    try:
-        print("\n[Ingestion] Fetching The Forge Master RSS Feed...")
-        from src.ingestion.rss_ingester import ingest_feed
-        master_source = {
-            "id": "the-forge-master",
-            "name": "The Forge McMaster",
-            "type": "blog",
-            "rss_feed_url": "https://theforge.mcmaster.ca/feed/"
-        }
-        forge_stats = await ingest_feed(master_source, fallback_startup_id="the-forge-mcmaster")
-        print(f"[Ingestion] The Forge Feed: {forge_stats.get('matched', 0)} articles matched, {forge_stats.get('new', 0)} newly inserted.")
-    except Exception as e:
-        print(f"[Ingestion] Error pulling The Forge RSS Feed: {e}")
 
-    # 2. Proceed with rolling batch Google News / Direct Web scrapes
     startups = [dict(row) for row in db.execute(
         """
-        SELECT * FROM startups 
+        SELECT * FROM startups
         WHERE tag IS NULL OR tag != 'not_active'
         ORDER BY last_ingested_at ASC NULLS FIRST
         LIMIT ?
         """, (limit,)
     ).fetchall()]
-    return await _run_ingestion(startups)
+    return await _run_ingestion(startups, progress=progress)
 
 
-async def ingest_selected_companies(startup_ids: list) -> list:
+async def ingest_selected_companies(startup_ids: list,
+                                    progress: Optional[dict] = None) -> list:
     """
     Run company-specific news search for SELECTED startups only.
     """
@@ -690,4 +738,4 @@ async def ingest_selected_companies(startup_ids: list) -> list:
             ORDER BY name""",
         startup_ids
     ).fetchall()]
-    return await _run_ingestion(startups)
+    return await _run_ingestion(startups, progress=progress)

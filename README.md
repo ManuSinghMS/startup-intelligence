@@ -1,178 +1,53 @@
-# 🚀 Startup Intelligence Platform
+# Startup Intelligence Platform
 
-Real-time intelligence on portfolio companies — automated ingestion from news, LinkedIn, newsletters, and Monday.com.
+A small FastAPI application that tracks news, social posts, and newsletter
+mentions for portfolio companies (built for The Forge incubator at McMaster
+University). Ingests from Google News, RSS, Monday.com, and Gmail; uses an
+LLM to classify and summarize content; serves a dashboard.
 
-## Features
+## Documentation
 
-- **News Ingestion** — Google News + DuckDuckGo, RSS feeds, HTML scraping
-- **LinkedIn (URL-First)** — Manual/Monday/CSV post-URL ingestion as the
-  primary path; Google News best-effort discovery as a secondary path. No
-  scraping of LinkedIn or Sales Navigator. URL-only items are stored with
-  `ingestion_status='url_only'` and shown as clickable cards.
-- **Newsletter Monitoring** — Gmail IMAP polling + Substack RSS
-- **Monday.com Sync** — Auto-sync startups + LinkedIn post URL columns
-  (`Founder Posts`, `Co-Founder Posts`, `Company Posts`)
-- **LLM Classification** — OpenAI / Copilot / Groq powered content categorization
-- **Founder-Weighted Scoring** — Founder/co-founder names are the primary
-  match signal (0.90/0.70) over company names (0.50/0.30) since names rename.
-- **Weekly Digests** — AI-generated executive summaries
-- **REST API** — Full FastAPI backend with Swagger docs
+The README is intentionally short. Pick the doc that matches your role:
 
-## Quick Start
+| If you are... | Read |
+|---|---|
+| A non-technical user opening the dashboard for the first time | [USER_GUIDE.md](USER_GUIDE.md) |
+| A developer who needs to run, modify, or understand the code | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) |
+| Deploying this to Fly.io from scratch (your own account) | [FLY_DEPLOY.md](FLY_DEPLOY.md) |
+| Connecting a Gmail inbox for newsletter ingestion | [NEWSLETTER_SETUP.md](NEWSLETTER_SETUP.md) |
+| Connecting Monday.com as a source of truth for companies | [MONDAY_SETUP.md](MONDAY_SETUP.md) |
+
+## What it does in one paragraph
+
+The team imports a list of companies (from Monday.com, CSV, or Excel). On a
+schedule (or on-demand from the dashboard), the platform searches Google News
+for each company, filters out irrelevant matches with a relevance score, and
+classifies each remaining article as funding / hiring / product launch /
+milestone / partnership / customer win / general using an LLM (Groq's free
+tier by default). The dashboard groups recent items by company and offers a
+weekly digest summary.
+
+## Quick local run
 
 ```bash
-# 1. Clone and install
-git clone <your-repo-url>
-cd startup-intel
 pip install -r requirements.txt
-
-# 2. Configure
-cp .env.example .env
-# Edit .env with your API keys
-
-# 3. Run
+cp .env.example .env       # fill in MONDAY_API_TOKEN and GROQ_API_KEY
 python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
-
-# 4. Open
-# Dashboard → http://localhost:8000
-# API Docs  → http://localhost:8000/docs
 ```
 
-## Architecture
+Dashboard: http://localhost:8000 - API docs: http://localhost:8000/docs
 
-```
-src/
-├── main.py                  # FastAPI app entry point
-├── db/
-│   ├── database.py          # SQLite connection (WAL mode)
-│   ├── schema.sql           # Database schema
-│   ├── migrate.py           # Schema migrations
-│   └── seed.py              # CSV/Excel import
-├── ingestion/
-│   ├── company_search.py    # Google News + DuckDuckGo search
-│   ├── linkedin_ingester.py # LinkedIn intelligence (free)
-│   ├── email_ingester.py    # Gmail IMAP polling
-│   ├── newsletter_ingester.py # Substack RSS
-│   ├── rss_ingester.py      # RSS feed ingestion
-│   ├── monday_sync.py       # Monday.com API sync
-│   ├── scheduler.py         # APScheduler background jobs
-│   └── dedup.py             # Deduplication
-├── scoring/
-│   └── relevance.py         # Founder-weighted relevance scoring
-├── llm/
-│   ├── provider.py          # LLM abstraction (OpenAI/Copilot/Groq)
-│   ├── classifier.py        # Content classification
-│   └── summarizer.py        # AI summary generation
-├── routes/
-│   ├── startups.py          # Startup CRUD + Monday.com sync
-│   ├── content.py           # Content management
-│   ├── social.py            # LinkedIn + newsletter triggers
-│   ├── sources.py           # Source management
-│   └── summaries.py         # AI summaries
-└── static/                  # Dashboard HTML
-```
+## Production
 
-## Ingestion Pipeline
+The currently-deployed instance lives on Fly.io. See
+[FLY_DEPLOY.md](FLY_DEPLOY.md) for the full deploy story (forking the repo
+into the team's own GitHub, creating a Fly app, setting secrets, etc.).
 
-The scheduler runs all ingestion automatically. Each source:
+## Important operational note
 
-| Source | Method | Config Required |
-|--------|--------|----------------|
-| News | Google News RSS + DuckDuckGo | None |
-| LinkedIn | Google News + DuckDuckGo search | None (free) |
-| Newsletter | Gmail IMAP | `NEWSLETTER_EMAIL`, `NEWSLETTER_APP_PASSWORD` |
-| Monday.com | GraphQL API v2 | `MONDAY_API_TOKEN`, `MONDAY_BOARD_ID` |
-| RSS | Feed polling | Add sources via API |
-
-### LinkedIn (URL-first, no scraping)
-
-LinkedIn post URLs are gathered three ways, in priority order:
-
-1. **Manual / Monday.com** (most reliable). Paste post URLs into the Monday
-   columns `Founder Posts` / `Co-Founder Posts` / `Company Posts`, then run
-   `python -m src.ingestion.monday_sync`.
-2. **CSV** — for environments without Monday.com. Drop a CSV like
-   [`data/manual_posts.sample.csv`](data/manual_posts.sample.csv) and run:
-   ```bash
-   python -m src.ingestion.linkedin_ingester --csv data/manual_posts.csv
-   ```
-3. **Auto-discovery** (best effort). Searches Google News for indexed
-   `linkedin.com/posts/` URLs. Often returns 0 for small/early startups.
-   ```bash
-   python -m src.ingestion.linkedin_ingester --dry-run --limit 3 --batch-size 1 --sleep-seconds 5
-   python -m src.ingestion.linkedin_ingester --demo            # zero-network fixture
-   python -m src.ingestion.linkedin_ingester --company "CompanyName"
-   ```
-
-URL validation rules: `linkedin.com/posts/...`, `/feed/update/...`, and
-`/pulse/...` are real post URLs. `/recent-activity/` and
-`/company/<slug>/posts/` are activity pages (stored but flagged separately).
-Bare profile/company pages update the startup row but are NOT stored as
-content. Profile-directory pages, `/jobs/`, `/login`, etc. are rejected.
-
-See [MONDAY_SETUP.md](MONDAY_SETUP.md) for the Sales-Navigator-assisted
-human workflow.
-
-### Monday.com
-
-Syncs startups from a Monday.com board, including LinkedIn post-URL columns.
-
-```bash
-# Preview columns
-python -m src.ingestion.monday_sync --preview-columns
-
-# Dry run
-python -m src.ingestion.monday_sync --dry-run
-
-# Sync
-python -m src.ingestion.monday_sync
-```
-
-Required env: `MONDAY_API_TOKEN`, `MONDAY_BOARD_ID`. Full setup in
-[MONDAY_SETUP.md](MONDAY_SETUP.md).
-
-## Scoring
-
-Relevance scoring prioritizes **founder/co-founder names** over company names:
-
-| Signal | Score |
-|--------|-------|
-| Founder name in title | 0.90 |
-| Founder name in body | 0.70 |
-| Company name in title | 0.50 |
-| Company name in body | 0.30 |
-| Both founder + company | 1.00 |
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/startups` | List all startups |
-| POST | `/api/startups` | Create startup |
-| POST | `/api/startups/sync-monday` | Sync from Monday.com |
-| POST | `/api/social/linkedin/ingest` | Run LinkedIn ingestion |
-| GET | `/api/social/linkedin/status` | LinkedIn health check |
-| POST | `/api/social/newsletter/ingest` | Poll newsletter inbox |
-| GET | `/api/content` | List content items |
-| GET | `/api/summaries/weekly` | Weekly digest |
-
-Full API docs at `http://localhost:8000/docs`
-
-## Deployment
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for Render, Railway, and VPS instructions.
-
-Quick deploy to Render:
-1. Push to GitHub
-2. Connect repo on [render.com](https://render.com)
-3. Click "Deploy" — `render.yaml` blueprint handles the rest
-
-## Tests
-
-```bash
-pytest tests/ -v
-```
-
-## Environment Variables
-
-See [.env.example](.env.example) for the complete list.
+Fly.io's free trial machines auto-stop after 5 minutes of activity. To make
+this deploy production-ready the team needs to add a credit card to the
+Fly.io account (no charge for the free allowance, but the timeout is lifted).
+The ingestion pipeline has been tuned to make as much progress as possible
+within a 5-minute window in case the trial limit is still in place - see
+[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for the details.

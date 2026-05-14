@@ -10,7 +10,7 @@ function initTheme() {
     const saved = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', saved);
     const btn = document.getElementById('theme-toggle');
-    if (btn) btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+    if (btn) btn.textContent = saved === 'dark' ? '' : '';
 }
 function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -18,7 +18,7 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
     const btn = document.getElementById('theme-toggle');
-    if (btn) btn.textContent = next === 'dark' ? '☀️' : '🌙';
+    if (btn) btn.textContent = next === 'dark' ? '' : '';
 }
 initTheme();
 
@@ -40,11 +40,11 @@ async function loadCompanyData() {
         document.title = `${data.startup.name} — Startup Intelligence`;
     } catch (e) {
         document.getElementById('company-header').innerHTML = `
-            <div class="empty-state">
-                <div class="icon">⚠️</div>
-                <h3>Company not found</h3>
-                <p><a href="/" style="color: var(--accent-light);">Return to dashboard</a></p>
-            </div>`;
+ <div class="empty-state">
+ <div class="icon"></div>
+ <h3>Company not found</h3>
+ <p><a href="/" style="color: var(--accent-light);">Return to dashboard</a></p>
+ </div>`;
     }
 }
 
@@ -52,25 +52,25 @@ function renderCompanyHeader(s) {
     const initials = s.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
     document.getElementById('company-header').innerHTML = `
-        <div class="company-header">
-            <div class="company-avatar">${initials}</div>
-            <div class="company-info" style="flex:1;">
-                <h1>${s.name}</h1>
+ <div class="company-header">
+ <div class="company-avatar">${initials}</div>
+ <div class="company-info" style="flex:1;">
+ <h1>${s.name}</h1>
                 ${s.legal_name ? `<div class="legal-name">${s.legal_name}</div>` : ''}
                 ${s.description ? `<p style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 8px;">${s.description}</p>` : ''}
-                <div class="company-meta">
-                    ${s.industry ? `<div class="meta-pill">🏭 ${s.industry}</div>` : ''}
-                    ${s.secondary_industry ? `<div class="meta-pill">🔬 ${s.secondary_industry}</div>` : ''}
-                    ${s.stage ? `<div class="meta-pill">📊 ${s.stage}</div>` : ''}
-                    ${s.status ? `<div class="meta-pill">📋 ${s.status}</div>` : ''}
-                    ${s.contact_name ? `<div class="meta-pill">👤 ${s.contact_name}</div>` : ''}
-                    ${s.contact_email ? `<div class="meta-pill">📧 ${s.contact_email}</div>` : ''}
-                    ${s.program_stream ? `<div class="meta-pill">🎓 ${s.program_stream}</div>` : ''}
-                    ${s.linkedin_url ? `<a href="${s.linkedin_url}" target="_blank" class="meta-pill" style="text-decoration:none;">🔗 LinkedIn</a>` : ''}
-                    ${s.twitter_handle ? `<a href="https://twitter.com/${s.twitter_handle}" target="_blank" class="meta-pill" style="text-decoration:none;">🐦 @${s.twitter_handle}</a>` : ''}
-                </div>
-            </div>
-        </div>`;
+ <div class="company-meta">
+                    ${s.industry ? `<div class="meta-pill"> ${s.industry}</div>` : ''}
+                    ${s.secondary_industry ? `<div class="meta-pill"> ${s.secondary_industry}</div>` : ''}
+                    ${s.stage ? `<div class="meta-pill"> ${s.stage}</div>` : ''}
+                    ${s.status ? `<div class="meta-pill"> ${s.status}</div>` : ''}
+                    ${s.contact_name ? `<div class="meta-pill"> ${s.contact_name}</div>` : ''}
+                    ${s.contact_email ? `<div class="meta-pill"> ${s.contact_email}</div>` : ''}
+                    ${s.program_stream ? `<div class="meta-pill"> ${s.program_stream}</div>` : ''}
+                    ${s.linkedin_url ? `<a href="${s.linkedin_url}" target="_blank" class="meta-pill" style="text-decoration:none;">LinkedIn</a>` : ''}
+                    ${s.twitter_handle ? `<a href="https://twitter.com/${s.twitter_handle}" target="_blank" class="meta-pill" style="text-decoration:none;"> @${s.twitter_handle}</a>` : ''}
+ </div>
+ </div>
+ </div>`;
 }
 
 function renderContent(items) {
@@ -78,33 +78,33 @@ function renderContent(items) {
 
     if (!items || items.length === 0) {
         container.innerHTML = `
-            <div class="empty-state">
-                <div class="icon">📭</div>
-                <h3>No content collected yet</h3>
-                <p>Run an ingestion to start collecting news and social posts for this company.</p>
-            </div>`;
+ <div class="empty-state">
+ <div class="icon"></div>
+ <h3>No content collected yet</h3>
+ <p>Run an ingestion to start collecting news and social posts for this company.</p>
+ </div>`;
         return;
     }
 
     const classLabel = {
-        funding: '💰 Funding', product_launch: '🚀 Product', milestone: '📈 Milestone',
-        hiring: '👥 Hiring', partnership: '🤝 Partnership', customer_win: '🎯 Customer',
-        general: '📰 General', unclassified: '📋 Unclassified'
+        funding: ' Funding', product_launch: ' Product', milestone: ' Milestone',
+        hiring: ' Hiring', partnership: ' Partnership', customer_win: ' Customer',
+        general: ' General', unclassified: ' Unclassified'
     };
 
     // Friendly labels for url-only items so the user sees attribution clearly.
     const urlKindLabel = {
-        founder_post_url:        '🧑 Founder LinkedIn post',
-        cofounder_post_url:      '🧑 Co-founder LinkedIn post',
-        company_post_url:        '🏢 Company LinkedIn post',
-        founder_activity_page:   '🧑 Founder activity page',
-        cofounder_activity_page: '🧑 Co-founder activity page',
-        company_activity_page:   '🏢 Company activity page',
-        founder_profile_url:     '🧑 Founder LinkedIn profile',
-        cofounder_profile_url:   '🧑 Co-founder LinkedIn profile',
-        company_page_url:        '🏢 Company LinkedIn page',
-        news_mention:            '📰 News mention',
-        web_mention:             '🌐 Web mention',
+        founder_post_url:        ' Founder LinkedIn post',
+        cofounder_post_url:      ' Co-founder LinkedIn post',
+        company_post_url:        ' Company LinkedIn post',
+        founder_activity_page:   ' Founder activity page',
+        cofounder_activity_page: ' Co-founder activity page',
+        company_activity_page:   ' Company activity page',
+        founder_profile_url:     ' Founder LinkedIn profile',
+        cofounder_profile_url:   ' Co-founder LinkedIn profile',
+        company_page_url:        ' Company LinkedIn page',
+        news_mention:            ' News mention',
+        web_mention:             ' Web mention',
     };
 
     function escapeHtml(s) {
@@ -142,56 +142,56 @@ function renderContent(items) {
             const author = item.author_name ? escapeHtml(item.author_name) : '';
             const conf = (item.confidence_score != null) ? Number(item.confidence_score).toFixed(2) : null;
             const isPost = (item.classification || '').endsWith('_post_url');
-            const ctaLabel = isPost ? '🔗 Open LinkedIn Post'
-                            : (item.classification || '').endsWith('_activity_page') ? '🔗 Open Activity Page'
-                            : '🔗 Open Link';
+            const ctaLabel = isPost ? ' Open LinkedIn Post'
+                            : (item.classification || '').endsWith('_activity_page') ? ' Open Activity Page'
+                            : ' Open Link';
             const sourceLabel = item.external_source === 'manual' ? 'Manual / Monday'
                               : item.external_source === 'google_news_rss' ? 'Auto-discovery (Google News)'
                               : (item.source_name || 'LinkedIn');
 
             return `
-                <div class="content-card" style="border-left: 4px solid #0a66c2;">
-                    <div class="content-card-header">
-                        <div class="content-card-title">
+ <div class="content-card" style="border-left: 4px solid #0a66c2;">
+ <div class="content-card-header">
+ <div class="content-card-title">
                             ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" style="color: #0a66c2;">${escapeHtml(item.title || 'LinkedIn link')}</a>` : escapeHtml(item.title || 'Untitled')}
-                        </div>
-                        <span class="tag" style="background:#e8f0fe;color:#0a66c2;">${kind}</span>
-                    </div>
-                    <div style="margin-top:8px;font-size:13px;color:#555;">
+ </div>
+ <span class="tag" style="background:#e8f0fe;color:#0a66c2;">${kind}</span>
+ </div>
+ <div style="margin-top:8px;font-size:13px;color:#555;">
                         URL-only — clicking opens LinkedIn directly. Post text is not stored locally.
-                    </div>
+ </div>
                     ${item.raw_content ? `<div class="content-card-summary" style="font-size:13px;margin-top:8px;color:#444;">${escapeHtml(item.raw_content)}</div>` : ''}
-                    <div style="margin-top: 12px; margin-bottom: 12px;">
+ <div style="margin-top: 12px; margin-bottom: 12px;">
                         ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="btn btn-primary" style="background: #0a66c2; color: white; text-decoration: none; padding: 6px 12px; border-radius: 4px; font-weight: 500; display: inline-block;">${ctaLabel}</a>` : ''}
-                    </div>
-                    <div class="content-card-meta">
-                        <span class="meta-item"><span class="icon">📰</span> ${escapeHtml(sourceLabel)}</span>
-                        ${author ? `<span class="meta-item"><span class="icon">✍️</span> ${author}</span>` : ''}
-                        ${role ? `<span class="meta-item"><span class="icon">🎯</span> ${role}</span>` : ''}
-                        <span class="meta-item"><span class="icon">📅</span> ${date}</span>
-                        ${discovered ? `<span class="meta-item" title="discovered_at"><span class="icon">🕒</span> found ${discovered}</span>` : ''}
-                        ${conf ? `<span class="meta-item" title="confidence_score"><span class="icon">📊</span> conf ${conf}</span>` : ''}
-                    </div>
-                </div>`;
+ </div>
+ <div class="content-card-meta">
+ <span class="meta-item"><span class="icon"></span> ${escapeHtml(sourceLabel)}</span>
+                        ${author ? `<span class="meta-item"><span class="icon"></span> ${author}</span>` : ''}
+                        ${role ? `<span class="meta-item"><span class="icon"></span> ${role}</span>` : ''}
+ <span class="meta-item"><span class="icon"></span> ${date}</span>
+                        ${discovered ? `<span class="meta-item" title="discovered_at"><span class="icon"></span>found ${discovered}</span>` : ''}
+                        ${conf ? `<span class="meta-item" title="confidence_score"><span class="icon"></span>conf ${conf}</span>` : ''}
+ </div>
+ </div>`;
         }
 
         return `
-            <div class="content-card">
-                <div class="content-card-header">
-                    <div class="content-card-title">
+ <div class="content-card">
+ <div class="content-card-header">
+ <div class="content-card-title">
                         ${item.url ? `<a href="${item.url}" target="_blank">${item.title || 'Untitled'}</a>` : (item.title || 'Untitled')}
-                    </div>
-                    <span class="tag tag-${item.classification || 'unclassified'}">
+ </div>
+ <span class="tag tag-${item.classification || 'unclassified'}">
                         ${classLabel[item.classification] || 'Unclassified'}
-                    </span>
-                </div>
+ </span>
+ </div>
                 ${item.summary ? `<div class="content-card-summary">${item.summary}</div>` : ''}
-                <div class="content-card-meta">
-                    <span class="meta-item"><span class="icon">📰</span> ${item.source_name || 'Unknown'}</span>
-                    <span class="meta-item"><span class="icon">📅</span> ${date}</span>
-                    <span class="tag tag-${item.source_type}">${item.source_type}</span>
-                </div>
-            </div>`;
+ <div class="content-card-meta">
+ <span class="meta-item"><span class="icon"></span> ${item.source_name || 'Unknown'}</span>
+ <span class="meta-item"><span class="icon"></span> ${date}</span>
+ <span class="tag tag-${item.source_type}">${item.source_type}</span>
+ </div>
+ </div>`;
     }).join('');
 }
 
@@ -208,27 +208,27 @@ function renderStats(stats) {
     const total = Object.values(stats).reduce((a, b) => a + b, 0);
 
     const labels = {
-        funding: { emoji: '💰', label: 'Funding' },
-        product_launch: { emoji: '🚀', label: 'Product' },
-        milestone: { emoji: '📈', label: 'Milestones' },
-        hiring: { emoji: '👥', label: 'Hiring' },
-        partnership: { emoji: '🤝', label: 'Partnerships' },
-        customer_win: { emoji: '🎯', label: 'Customers' },
-        general: { emoji: '📰', label: 'General' },
-        unclassified: { emoji: '📋', label: 'Unclassified' }
+        funding: { emoji: '', label: 'Funding' },
+        product_launch: { emoji: '', label: 'Product' },
+        milestone: { emoji: '', label: 'Milestones' },
+        hiring: { emoji: '', label: 'Hiring' },
+        partnership: { emoji: '', label: 'Partnerships' },
+        customer_win: { emoji: '', label: 'Customers' },
+        general: { emoji: '', label: 'General' },
+        unclassified: { emoji: '', label: 'Unclassified' }
     };
 
     grid.innerHTML = `
-        <div class="stat-card">
-            <div class="stat-label">Total Items</div>
-            <div class="stat-value">${total}</div>
-        </div>
+ <div class="stat-card">
+ <div class="stat-label">Total Items</div>
+ <div class="stat-value">${total}</div>
+ </div>
         ${Object.entries(stats).map(([cls, count]) => `
-            <div class="stat-card">
-                <div class="stat-label">${labels[cls]?.emoji || ''} ${labels[cls]?.label || cls}</div>
-                <div class="stat-value">${count}</div>
-                <div class="stat-detail">${Math.round(count / total * 100)}% of total</div>
-            </div>
+ <div class="stat-card">
+ <div class="stat-label">${labels[cls]?.emoji || ''} ${labels[cls]?.label || cls}</div>
+ <div class="stat-value">${count}</div>
+ <div class="stat-detail">${Math.round(count / total * 100)}% of total</div>
+ </div>
         `).join('')}`;
 }
 
@@ -257,17 +257,17 @@ async function generateSummary(days) {
         const data = await res.json();
 
         container.innerHTML = `
-            <div class="digest-card">
-                <h3>📊 ${data.startup} — ${days}-Day Summary</h3>
-                <div class="digest-content">${renderMarkdown(data.summary)}</div>
-                <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">
+ <div class="digest-card">
+ <h3> ${data.startup} — ${days}-Day Summary</h3>
+ <div class="digest-content">${renderMarkdown(data.summary)}</div>
+ <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">
                     Based on ${data.items_count} content items.
-                </div>
-            </div>`;
+ </div>
+ </div>`;
 
         showToast('Summary generated!', 'success');
     } catch (e) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to generate summary</h3></div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon"></div><h3>Failed to generate summary</h3></div>';
         showToast('Failed to generate summary', 'error');
     }
 }

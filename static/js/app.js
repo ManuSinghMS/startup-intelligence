@@ -33,7 +33,7 @@ function toggleTheme() {
 
 function updateThemeIcon(theme) {
     const btn = document.getElementById('theme-toggle');
-    if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    if (btn) btn.textContent = theme === 'dark' ? '' : '';
 }
 
 initTheme();
@@ -157,11 +157,11 @@ async function loadContent() {
 
         if (data.items.length === 0) {
             feed.innerHTML = `
-                <div class="empty-state">
-                    <div class="icon">📭</div>
-                    <h3>No content found</h3>
-                    <p>Try adjusting your filters or run an ingestion to fetch new content.</p>
-                </div>`;
+ <div class="empty-state">
+ <div class="icon"></div>
+ <h3>No content found</h3>
+ <p>Try adjusting your filters or run an ingestion to fetch new content.</p>
+ </div>`;
             document.getElementById('pagination').innerHTML = '';
             return;
         }
@@ -188,12 +188,12 @@ async function loadContent() {
 
         if (unmapped.length > 0) {
             html += `
-                <div style="margin-top: 1.5rem;">
-                    <div class="section-header">
-                        <h3 class="section-title" style="font-size: 1rem; color: var(--text-muted);">📋 Unmatched Items (${unmapped.length})</h3>
-                    </div>
+ <div style="margin-top: 1.5rem;">
+ <div class="section-header">
+ <h3 class="section-title" style="font-size: 1rem; color: var(--text-muted);">Unmatched Items (${unmapped.length})</h3>
+ </div>
                     ${unmapped.map(item => renderContentCard(item)).join('')}
-                </div>`;
+ </div>`;
         }
 
         feed.innerHTML = html;
@@ -203,11 +203,11 @@ async function loadContent() {
         document.getElementById('pagination').innerHTML = '';
     } catch (e) {
         feed.innerHTML = `
-            <div class="empty-state">
-                <div class="icon">⚠️</div>
-                <h3>Failed to load content</h3>
-                <p>Make sure the server is running at ${API || 'localhost:8000'}</p>
-            </div>`;
+ <div class="empty-state">
+ <div class="icon"></div>
+ <h3>Failed to load content</h3>
+ <p>Make sure the server is running at ${API || 'localhost:8000'}</p>
+ </div>`;
     }
 }
 
@@ -216,23 +216,23 @@ function renderCompanyGroup(company) {
     const hasMore = company.items.length > 5;
 
     return `
-        <div style="margin-bottom: 2rem;" class="company-group" data-company-id="${company.id}">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-                <a href="/company/${company.id}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text-primary);">
-                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--funding)); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: white; flex-shrink: 0;">
+ <div style="margin-bottom: 2rem;" class="company-group" data-company-id="${company.id}">
+ <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+ <a href="/company/${company.id}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text-primary);">
+ <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--funding)); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; color: white; flex-shrink: 0;">
                         ${company.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                        <div style="font-weight: 600; font-size: 1rem;">${company.name}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted);" class="article-count-text">${company.items.length} article${company.items.length !== 1 ? 's' : ''} found</div>
-                    </div>
-                </a>
+ </div>
+ <div>
+ <div style="font-weight: 600; font-size: 1rem;">${company.name}</div>
+ <div style="font-size: 0.75rem; color: var(--text-muted);" class="article-count-text">${company.items.length} article${company.items.length !== 1 ? 's' : ''} found</div>
+ </div>
+ </a>
                 ${hasMore ? `<a href="/company/${company.id}" class="nav-btn view-all-text" style="font-size: 0.75rem; text-decoration: none;">View all ${company.items.length} →</a>` : ''}
-            </div>
-            <div class="content-feed">
+ </div>
+ <div class="content-feed">
                 ${latestItems.map(item => renderContentCard(item)).join('')}
-            </div>
-        </div>`;
+ </div>
+ </div>`;
 }
 
 function renderContentCard(item) {
@@ -241,22 +241,22 @@ function renderContentCard(item) {
     }) : 'Unknown date';
 
     const classLabel = {
-        funding: '💰 Funding', product_launch: '🚀 Product', milestone: '📈 Milestone',
-        hiring: '👥 Hired', partnership: '🤝 Partnership', customer_win: '🎯 Customer',
-        general: '📰 General', unclassified: '📋 Unclassified'
+        funding: ' Funding', product_launch: ' Product', milestone: ' Milestone',
+        hiring: ' Hired', partnership: ' Partnership', customer_win: ' Customer',
+        general: ' General', unclassified: ' Unclassified'
     };
     const urlKindLabel = {
-        founder_post_url:        '🧑 Founder LinkedIn post',
-        cofounder_post_url:      '🧑 Co-founder LinkedIn post',
-        company_post_url:        '🏢 Company LinkedIn post',
-        founder_activity_page:   '🧑 Founder activity page',
-        cofounder_activity_page: '🧑 Co-founder activity page',
-        company_activity_page:   '🏢 Company activity page',
-        founder_profile_url:     '🧑 Founder LinkedIn profile',
-        cofounder_profile_url:   '🧑 Co-founder LinkedIn profile',
-        company_page_url:        '🏢 Company LinkedIn page',
-        news_mention:            '📰 News mention',
-        web_mention:             '🌐 Web mention',
+        founder_post_url:        ' Founder LinkedIn post',
+        cofounder_post_url:      ' Co-founder LinkedIn post',
+        company_post_url:        ' Company LinkedIn post',
+        founder_activity_page:   ' Founder activity page',
+        cofounder_activity_page: ' Co-founder activity page',
+        company_activity_page:   ' Company activity page',
+        founder_profile_url:     ' Founder LinkedIn profile',
+        cofounder_profile_url:   ' Co-founder LinkedIn profile',
+        company_page_url:        ' Company LinkedIn page',
+        news_mention:            ' News mention',
+        web_mention:             ' Web mention',
     };
 
     function escapeHtml(s) {
@@ -268,59 +268,59 @@ function renderContentCard(item) {
     if (item.ingestion_status === 'url_only') {
         const kind = urlKindLabel[item.classification] || 'LinkedIn link';
         const isPost = (item.classification || '').endsWith('_post_url');
-        const ctaLabel = isPost ? '🔗 Open LinkedIn Post'
-                        : (item.classification || '').endsWith('_activity_page') ? '🔗 Open Activity Page'
-                        : '🔗 Open Link';
+        const ctaLabel = isPost ? ' Open LinkedIn Post'
+                        : (item.classification || '').endsWith('_activity_page') ? ' Open Activity Page'
+                        : ' Open Link';
         const sourceLabel = item.external_source === 'manual' ? 'Manual / Monday'
                           : item.external_source === 'google_news_rss' ? 'Auto (Google News)'
                           : (item.source_name || 'LinkedIn');
         return `
-        <div class="content-card" data-id="${item.id}" style="border-left:4px solid #0a66c2;">
-            <div class="content-card-header">
-                <div class="content-card-title">
+ <div class="content-card" data-id="${item.id}" style="border-left:4px solid #0a66c2;">
+ <div class="content-card-header">
+ <div class="content-card-title">
                     ${item.url ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" style="color:#0a66c2;">${escapeHtml(item.title || 'LinkedIn link')}</a>` : escapeHtml(item.title || 'Untitled')}
-                </div>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <span class="tag" style="background:#e8f0fe;color:#0a66c2;">${kind}</span>
-                    <button onclick="deleteContent('${item.id}', this)" title="Delete this item"
+ </div>
+ <div style="display:flex;gap:6px;align-items:center;">
+ <span class="tag" style="background:#e8f0fe;color:#0a66c2;">${kind}</span>
+ <button onclick="deleteContent('${item.id}', this)" title="Delete this item"
                         style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:2px 4px;border-radius:4px;opacity:0.5;"
-                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">🗑️</button>
-                </div>
-            </div>
+                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'"></button>
+ </div>
+ </div>
             ${item.url ? `<div style="margin-top:8px;"><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="btn btn-primary" style="background:#0a66c2;color:white;text-decoration:none;padding:6px 12px;border-radius:4px;font-weight:500;display:inline-block;font-size:13px;">${ctaLabel}</a></div>` : ''}
-            <div class="content-card-meta" style="margin-top:8px;">
+ <div class="content-card-meta" style="margin-top:8px;">
                 ${item.startup_name ? `<a href="/company/${item.startup_id}" class="startup-tag">${escapeHtml(item.startup_name)}</a>` : ''}
-                <span class="meta-item"><span class="icon">📰</span> ${escapeHtml(sourceLabel)}</span>
-                ${item.author_name ? `<span class="meta-item"><span class="icon">✍️</span> ${escapeHtml(item.author_name)}</span>` : ''}
-                <span class="meta-item"><span class="icon">📅</span> ${date}</span>
-            </div>
-        </div>`;
+ <span class="meta-item"><span class="icon"></span> ${escapeHtml(sourceLabel)}</span>
+                ${item.author_name ? `<span class="meta-item"><span class="icon"></span> ${escapeHtml(item.author_name)}</span>` : ''}
+ <span class="meta-item"><span class="icon"></span> ${date}</span>
+ </div>
+ </div>`;
     }
 
     const urlLink = item.url ? `<a href="${item.url}" target="_blank" rel="noopener">${item.title || 'Untitled'}</a>` : (item.title || 'Untitled');
 
     return `
-        <div class="content-card" data-id="${item.id}">
-            <div class="content-card-header">
-                <div class="content-card-title">${urlLink}</div>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <span class="tag tag-${item.classification || 'unclassified'}">
+ <div class="content-card" data-id="${item.id}">
+ <div class="content-card-header">
+ <div class="content-card-title">${urlLink}</div>
+ <div style="display:flex;gap:6px;align-items:center;">
+ <span class="tag tag-${item.classification || 'unclassified'}">
                         ${classLabel[item.classification] || item.classification || 'Unclassified'}
-                    </span>
-                    <button onclick="deleteContent('${item.id}', this)" title="Delete this item"
+ </span>
+ <button onclick="deleteContent('${item.id}', this)" title="Delete this item"
                         style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:2px 4px;border-radius:4px;opacity:0.5;transition:opacity 0.2s;"
-                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">🗑️</button>
-                </div>
-            </div>
+                        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'"></button>
+ </div>
+ </div>
             ${item.summary ? `<div class="content-card-summary">${item.summary}</div>` : ''}
-            <div class="content-card-meta">
+ <div class="content-card-meta">
                 ${item.startup_name ? `<a href="/company/${item.startup_id}" class="startup-tag">${item.startup_name}</a>` : ''}
-                <span class="meta-item"><span class="icon">📰</span> ${item.source_name || 'Unknown'}</span>
-                <span class="meta-item"><span class="icon">📅</span> ${date}</span>
-                <span class="tag tag-${item.source_type}">${item.source_type}</span>
-                ${item.sentiment ? `<span class="meta-item">${item.sentiment === 'positive' ? '😊' : item.sentiment === 'negative' ? '😟' : '😐'} ${item.sentiment}</span>` : ''}
-            </div>
-        </div>`;
+ <span class="meta-item"><span class="icon"></span> ${item.source_name || 'Unknown'}</span>
+ <span class="meta-item"><span class="icon"></span> ${date}</span>
+ <span class="tag tag-${item.source_type}">${item.source_type}</span>
+                ${item.sentiment ? `<span class="meta-item">${item.sentiment === 'positive' ? '' : item.sentiment === 'negative' ? '' : ''} ${item.sentiment}</span>` : ''}
+ </div>
+ </div>`;
 }
 
 function renderPagination(total) {
@@ -390,14 +390,14 @@ const CHART_COLORS = {
 };
 
 const CHART_LABELS = {
-    funding: '💰 Funding',
-    product_launch: '🚀 Product Launch',
-    milestone: '📈 Milestone',
-    hiring: '👥 Hired',
-    partnership: '🤝 Partnership',
-    customer_win: '🎯 Customer Win',
-    general: '📰 General',
-    unclassified: '📋 Unclassified',
+    funding: ' Funding',
+    product_launch: ' Product Launch',
+    milestone: ' Milestone',
+    hiring: ' Hired',
+    partnership: ' Partnership',
+    customer_win: ' Customer Win',
+    general: ' General',
+    unclassified: ' Unclassified',
 };
 
 async function loadAnalytics() {
@@ -562,10 +562,10 @@ function renderDrilldown(containerId, items) {
         return;
     }
     container.innerHTML = items.map((item, i) => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
-            <span style="font-size: 0.85rem;">${i + 1}. ${item.name}</span>
-            <span style="font-size: 0.85rem; font-weight: 600; color: var(--accent);">${item.count}</span>
-        </div>
+ <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+ <span style="font-size: 0.85rem;">${i + 1}. ${item.name}</span>
+ <span style="font-size: 0.85rem; font-weight: 600; color: var(--accent);">${item.count}</span>
+ </div>
     `).join('');
 }
 
@@ -581,7 +581,7 @@ async function reclassifyAll() {
     } catch (e) {
         showToast('Re-classification failed', 'error');
     } finally {
-        btn.textContent = '🔄 Re-classify All';
+        btn.textContent = ' Re-classify All';
         btn.disabled = false;
     }
 }
@@ -590,17 +590,17 @@ async function reclassifyAll() {
 
 function buildTagFilterBar() {
     return `
-        <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
-            <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Filter:</span>
-            <button class="nav-btn ${!companyTagFilter ? 'active' : ''}" onclick="setTagFilter('')" style="font-size:0.75rem;">All Active</button>
-            <button class="nav-btn ${companyTagFilter === 'active' ? 'active' : ''}" onclick="setTagFilter('active')" style="font-size:0.75rem;">🟢 Active</button>
-            <button class="nav-btn ${companyTagFilter === 'alumni' ? 'active' : ''}" onclick="setTagFilter('alumni')" style="font-size:0.75rem;">🔵 Alumni</button>
-            <button class="nav-btn ${companyTagFilter === 'not_active' ? 'active' : ''}" onclick="setTagFilter('not_active')" style="font-size:0.75rem;">🔴 Not Active</button>
-            <button class="nav-btn ${companyTagFilter === 'all' ? 'active' : ''}" onclick="setTagFilter('all')" style="font-size:0.75rem;">📋 Show All</button>
-            <span style="flex:1;"></span>
-            <button class="nav-btn" onclick="removeDeactivated()" style="font-size:0.75rem;color:var(--danger);"
-                title="Permanently delete all not_active companies">🗑️ Remove Deactivated</button>
-        </div>`;
+ <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+ <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Filter:</span>
+ <button class="nav-btn ${!companyTagFilter ? 'active' : ''}" onclick="setTagFilter('')" style="font-size:0.75rem;">All Active</button>
+ <button class="nav-btn ${companyTagFilter === 'active' ? 'active' : ''}" onclick="setTagFilter('active')" style="font-size:0.75rem;">Active</button>
+ <button class="nav-btn ${companyTagFilter === 'alumni' ? 'active' : ''}" onclick="setTagFilter('alumni')" style="font-size:0.75rem;">Alumni</button>
+ <button class="nav-btn ${companyTagFilter === 'not_active' ? 'active' : ''}" onclick="setTagFilter('not_active')" style="font-size:0.75rem;">Not Active</button>
+ <button class="nav-btn ${companyTagFilter === 'all' ? 'active' : ''}" onclick="setTagFilter('all')" style="font-size:0.75rem;">Show All</button>
+ <span style="flex:1;"></span>
+ <button class="nav-btn" onclick="removeDeactivated()" style="font-size:0.75rem;color:var(--danger);"
+                title="Permanently delete all not_active companies">Remove Deactivated</button>
+ </div>`;
 }
 
 async function loadCompanies(search = '') {
@@ -619,51 +619,51 @@ async function loadCompanies(search = '') {
         const filterBar = buildTagFilterBar();
 
         if (data.startups.length === 0) {
-            container.innerHTML = filterBar + '<div class="empty-state"><div class="icon">🏢</div><h3>No companies with this tag</h3><p>Try a different filter above.</p></div>';
+            container.innerHTML = filterBar + '<div class="empty-state"><div class="icon"></div><h3>No companies with this tag</h3><p>Try a different filter above.</p></div>';
             return;
         }
 
         const tagBadge = (tag) => {
             const badges = {
-                active: '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.65rem;font-weight:600;background:#22c55e20;color:#22c55e;">🟢 Active</span>',
-                alumni: '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.65rem;font-weight:600;background:#3b82f620;color:#3b82f6;">🔵 Alumni</span>',
-                not_active: '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.65rem;font-weight:600;background:#ef444420;color:#ef4444;">🔴 Not Active</span>',
+                active: '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.65rem;font-weight:600;background:#22c55e20;color:#22c55e;">Active</span>',
+                alumni: '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.65rem;font-weight:600;background:#3b82f620;color:#3b82f6;">Alumni</span>',
+                not_active: '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.65rem;font-weight:600;background:#ef444420;color:#ef4444;">Not Active</span>',
             };
             return badges[tag] || badges.active;
         };
 
         container.innerHTML = filterBar + data.startups.map(s => `
-            <div class="content-card" style="position:relative;">
-                <div class="content-card-header">
-                    <div>
-                        <a href="/company/${s.id}" style="text-decoration:none;color:var(--text-primary);">
-                            <div class="content-card-title">
+ <div class="content-card" style="position:relative;">
+ <div class="content-card-header">
+ <div>
+ <a href="/company/${s.id}" style="text-decoration:none;color:var(--text-primary);">
+ <div class="content-card-title">
                                 ${s.name}
                                 ${tagBadge(s.tag || 'active')}
-                            </div>
-                        </a>
+ </div>
+ </a>
                         ${s.legal_name ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">${s.legal_name}</div>` : ''}
-                    </div>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        <span class="tag tag-general">${s.content_count || 0} items</span>
-                        <select onchange="changeTag('${s.id}', this.value)" style="font-size:0.7rem;padding:2px 4px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);cursor:pointer;">
-                            <option value="active" ${(s.tag || 'active') === 'active' ? 'selected' : ''}>Active</option>
-                            <option value="alumni" ${s.tag === 'alumni' ? 'selected' : ''}>Alumni</option>
-                            <option value="not_active" ${s.tag === 'not_active' ? 'selected' : ''}>Not Active</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="content-card-meta">
-                    ${s.industry ? `<span class="meta-item">🏭 ${s.industry}</span>` : ''}
-                    ${s.stage ? `<span class="meta-item">📊 ${s.stage}</span>` : ''}
-                    ${s.contact_name ? `<span class="meta-item">👤 ${s.contact_name}</span>` : ''}
-                    ${s.last_activity ? `<span class="meta-item">📅 Last: ${new Date(s.last_activity).toLocaleDateString()}</span>` : ''}
-                    ${s.linkedin_url ? `<a href="${s.linkedin_url}" target="_blank" class="meta-item" style="text-decoration:none;">🔗 LinkedIn</a>` : ''}
-                </div>
-            </div>
+ </div>
+ <div style="display:flex;gap:6px;align-items:center;">
+ <span class="tag tag-general">${s.content_count || 0} items</span>
+ <select onchange="changeTag('${s.id}', this.value)" style="font-size:0.7rem;padding:2px 4px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);cursor:pointer;">
+ <option value="active" ${(s.tag || 'active') === 'active' ? 'selected' : ''}>Active</option>
+ <option value="alumni" ${s.tag === 'alumni' ? 'selected' : ''}>Alumni</option>
+ <option value="not_active" ${s.tag === 'not_active' ? 'selected' : ''}>Not Active</option>
+ </select>
+ </div>
+ </div>
+ <div class="content-card-meta">
+                    ${s.industry ? `<span class="meta-item"> ${s.industry}</span>` : ''}
+                    ${s.stage ? `<span class="meta-item"> ${s.stage}</span>` : ''}
+                    ${s.contact_name ? `<span class="meta-item"> ${s.contact_name}</span>` : ''}
+                    ${s.last_activity ? `<span class="meta-item">Last: ${new Date(s.last_activity).toLocaleDateString()}</span>` : ''}
+                    ${s.linkedin_url ? `<a href="${s.linkedin_url}" target="_blank" class="meta-item" style="text-decoration:none;">LinkedIn</a>` : ''}
+ </div>
+ </div>
         `).join('');
     } catch (e) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to load companies</h3></div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon"></div><h3>Failed to load companies</h3></div>';
     }
 }
 
@@ -735,12 +735,12 @@ async function submitImport() {
             const resultEl = document.getElementById('import-result');
             resultEl.style.display = 'block';
             resultEl.innerHTML = `
-                <div style="font-size: 0.9rem;">
-                    <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">✅ Import Complete</div>
-                    <div>📥 <strong>${data.imported}</strong> new companies imported</div>
-                    <div>⏭️ <strong>${data.skipped}</strong> duplicates skipped</div>
-                    <div>📄 <strong>${data.total_in_file}</strong> total rows in file</div>
-                </div>`;
+ <div style="font-size: 0.9rem;">
+ <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">Import Complete</div>
+ <div> <strong>${data.imported}</strong>new companies imported</div>
+ <div>⏭ <strong>${data.skipped}</strong>duplicates skipped</div>
+ <div> <strong>${data.total_in_file}</strong>total rows in file</div>
+ </div>`;
             showToast(`Imported ${data.imported} companies (${data.skipped} skipped)`, 'success');
             loadCompanies();
         } else {
@@ -749,7 +749,7 @@ async function submitImport() {
     } catch (e) {
         showToast('Import failed — check file format', 'error');
     } finally {
-        btn.textContent = '📤 Upload & Import';
+        btn.textContent = ' Upload & Import';
         btn.disabled = false;
     }
 }
@@ -792,6 +792,20 @@ function showIngestionModal() {
     document.getElementById('company-picker').style.display = 'none';
     document.getElementById('ingestion-progress').style.display = 'none';
     loadCompaniesForPicker();
+    refreshCycleSummary();
+    pollIngestionStatus(true);
+}
+
+async function refreshCycleSummary() {
+    try {
+        const res = await fetch(`${API}/api/ingest/status`);
+        const data = await res.json();
+        const el = document.getElementById('cycle-summary');
+        if (!el) return;
+        el.textContent =
+            `Cycle so far: ${data.cycled_24h} of ${data.total_companies} companies ingested in the last 24h ` +
+            `(${data.remaining_24h} remaining).`;
+    } catch (e) { /* non-fatal */ }
 }
 
 async function loadCompaniesForPicker() {
@@ -816,12 +830,12 @@ async function loadCompaniesForPicker() {
 function renderCompanyPicker(companies) {
     const container = document.getElementById('company-checklist');
     container.innerHTML = companies.map(s => `
-        <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background 0.15s;"
+ <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: background 0.15s;"
                onmouseover="this.style.background='var(--bg-sidebar)'" onmouseout="this.style.background='transparent'">
-            <input type="checkbox" class="company-checkbox" value="${s.id}" style="cursor: pointer;">
-            <span>${s.name}</span>
-            <span style="margin-left: auto; font-size: 0.7rem; color: var(--text-muted);">${s.content_count || 0} items</span>
-        </label>
+ <input type="checkbox" class="company-checkbox" value="${s.id}" style="cursor: pointer;">
+ <span>${s.name}</span>
+ <span style="margin-left: auto; font-size: 0.7rem; color: var(--text-muted);">${s.content_count || 0} items</span>
+ </label>
     `).join('');
 
     // Update count on change
@@ -848,13 +862,18 @@ function toggleAllPicker() {
     updatePickerCount();
 }
 
+let _ingestPollHandle = null;
+
 async function runIngestion(mode) {
     const progress = document.getElementById('ingestion-progress');
     progress.style.display = 'block';
     const statusEl = document.getElementById('ingestion-status');
+    document.getElementById('ingestion-bar').style.width = '0%';
+    document.getElementById('ingestion-meta').textContent = '';
+    document.getElementById('ingestion-current').textContent = '';
+    statusEl.textContent = 'Starting...';
 
     let body = {};
-
     if (mode === 'selected') {
         const selected = Array.from(document.querySelectorAll('.company-checkbox:checked')).map(cb => cb.value);
         if (selected.length === 0) {
@@ -863,9 +882,6 @@ async function runIngestion(mode) {
             return;
         }
         body = { startup_ids: selected };
-        statusEl.textContent = `Ingesting ${selected.length} companies...`;
-    } else {
-        statusEl.textContent = `Ingesting all companies...`;
     }
 
     try {
@@ -875,29 +891,88 @@ async function runIngestion(mode) {
             body: JSON.stringify(body),
         });
         const data = await res.json();
-        
-        // Fetch ingestion status to show which companies were processed
-        let companyList = '';
-        try {
-            const statusRes = await fetch(`${API}/api/ingest/status`);
-            const statusData = await statusRes.json();
-            if (statusData.companies_this_batch && statusData.companies_this_batch.length > 0) {
-                const companies = statusData.companies_this_batch.map(c => c.name).join(', ');
-                companyList = `<br><small style="color: #666;">Processed: ${companies}</small>`;
-            }
-        } catch (e) {
-            console.warn('Could not fetch ingestion status:', e);
+        if (data.status === 'already_running') {
+            showToast('An ingestion job is already running. Showing live progress.', 'info');
+        } else if (data.status === 'started') {
+            showToast('Ingestion started in the background.', 'success');
         }
-        
-        statusEl.innerHTML = `✅ Done! ${data.total_new} new items found, ${data.classified || 0} classified.${companyList}`;
-        showToast(`Ingestion complete: ${data.total_new} new items`, 'success');
-        loadDashboard();
-        setTimeout(() => closeModal('modal-ingestion'), 2000);
+        pollIngestionStatus(false);
     } catch (e) {
-        statusEl.textContent = '❌ Ingestion failed — check server logs.';
-        showToast('Ingestion failed', 'error');
-        setTimeout(() => closeModal('modal-ingestion'), 3000);
+        statusEl.textContent = 'Ingestion failed to start - check server logs.';
+        showToast('Ingestion failed to start', 'error');
     }
+}
+
+function _stopIngestPolling() {
+    if (_ingestPollHandle) {
+        clearInterval(_ingestPollHandle);
+        _ingestPollHandle = null;
+    }
+}
+
+async function pollIngestionStatus(silentIfIdle) {
+    _stopIngestPolling();
+    const tick = async () => {
+        let data;
+        try {
+            const res = await fetch(`${API}/api/ingest/status`);
+            data = await res.json();
+        } catch (e) {
+            return;
+        }
+        const job = data.job || {};
+        const progressBox = document.getElementById('ingestion-progress');
+        const statusEl = document.getElementById('ingestion-status');
+        const barEl = document.getElementById('ingestion-bar');
+        const metaEl = document.getElementById('ingestion-meta');
+        const currentEl = document.getElementById('ingestion-current');
+
+        if (job.status === 'running') {
+            progressBox.style.display = 'block';
+            const total = job.total || 0;
+            const done = job.completed || 0;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 5;
+            statusEl.textContent = `Ingesting... ${done}/${total} companies (${pct}%)`;
+            barEl.style.width = pct + '%';
+            metaEl.textContent = `New items so far: ${job.new_items || 0} - Classified: ${job.classified || 0}`;
+            currentEl.textContent = job.current_company ? `Currently processing: ${job.current_company}` : '';
+            refreshIngestionLogs();
+        } else if (job.status === 'completed') {
+            progressBox.style.display = 'block';
+            statusEl.textContent = `Done. ${job.completed}/${job.total} companies, ${job.new_items} new items, ${job.classified} classified.`;
+            barEl.style.width = '100%';
+            currentEl.textContent = '';
+            metaEl.textContent = `Cycle so far: ${data.cycled_24h} of ${data.total_companies} in the last 24h.`;
+            refreshCycleSummary();
+            loadDashboard();
+            refreshIngestionLogs();
+            _stopIngestPolling();
+        } else if (job.status === 'error') {
+            progressBox.style.display = 'block';
+            statusEl.textContent = `Error: ${job.error}`;
+            refreshIngestionLogs();
+            _stopIngestPolling();
+        } else {
+            if (!silentIfIdle) {
+                statusEl.textContent = 'No ingestion job running.';
+            }
+            _stopIngestPolling();
+        }
+    };
+    await tick();
+    _ingestPollHandle = setInterval(tick, 2500);
+}
+
+async function refreshIngestionLogs() {
+    try {
+        const res = await fetch(`${API}/api/ingest/logs`);
+        const data = await res.json();
+        const panel = document.getElementById('ingestion-log-panel');
+        if (panel && data.lines) {
+            panel.textContent = data.lines.slice(-50).join('\n');
+            panel.scrollTop = panel.scrollHeight;
+        }
+    } catch (e) { /* non-fatal */ }
 }
 
 // ========== DIGEST ==========
@@ -922,75 +997,75 @@ function renderDigestData(digest) {
     const itemCount = digest.items_count != null ? digest.items_count : '';
 
     const metaBar = `
-        <div class="digest-meta-bar">
-            <span class="digest-meta-period">📅 ${_digestEscape(periodLabel)}</span>
-            <span class="digest-meta-sep">·</span>
-            <span>${companies.length} companies</span>
+ <div class="digest-meta-bar">
+ <span class="digest-meta-period"> ${_digestEscape(periodLabel)}</span>
+ <span class="digest-meta-sep">·</span>
+ <span>${companies.length} companies</span>
             ${itemCount !== '' ? `<span class="digest-meta-sep">·</span><span>${itemCount} content items</span>` : ''}
             ${generatedAt ? `<span class="digest-meta-sep">·</span><span>Generated ${_digestEscape(generatedAt)}</span>` : ''}
-        </div>`;
+ </div>`;
 
     if (digest.legacy) {
         return metaBar + `
-            <div class="empty-state">
-                <div class="icon">🔄</div>
-                <h3>Digest format outdated</h3>
-                <p>Click "Generate Digest" to create an updated per-company digest.</p>
-            </div>`;
+ <div class="empty-state">
+ <div class="icon"></div>
+ <h3>Digest format outdated</h3>
+ <p>Click "Generate Digest" to create an updated per-company digest.</p>
+ </div>`;
     }
 
     if (!companies.length) {
         return metaBar + `
-            <div class="empty-state">
-                <div class="icon">📋</div>
-                <h3>No company activity found in this period</h3>
-                <p>Try a longer timeframe or run ingestion to pull in recent content.</p>
-            </div>`;
+ <div class="empty-state">
+ <div class="icon"></div>
+ <h3>No company activity found in this period</h3>
+ <p>Try a longer timeframe or run ingestion to pull in recent content.</p>
+ </div>`;
     }
 
     const cards = companies.map(c => {
         const sections = [
-            { label: '📌 Key Updates',                items: c.key_updates },
-            { label: '🔗 LinkedIn & Founder Activity', items: c.linkedin_activity },
-            { label: '📰 News & Web Mentions',         items: c.news_mentions },
-            { label: '🚀 Opportunities',               items: c.opportunities },
-            { label: '⚠️ Risks & Concerns',            items: c.risks },
+            { label: ' Key Updates',                items: c.key_updates },
+            { label: ' LinkedIn & Founder Activity', items: c.linkedin_activity },
+            { label: ' News & Web Mentions',         items: c.news_mentions },
+            { label: ' Opportunities',               items: c.opportunities },
+            { label: ' Risks & Concerns',            items: c.risks },
         ].filter(s => Array.isArray(s.items) && s.items.length > 0);
 
         const hasContent = sections.length > 0 || c.next_action;
 
         if (!hasContent) {
             return `
-                <div class="stat-card company-digest-card company-digest-empty">
-                    <div class="company-digest-header">
-                        <h3 class="company-digest-name">${_digestEscape(c.company)}</h3>
-                    </div>
-                    <p class="company-digest-no-activity">No notable activity in this period.</p>
-                </div>`;
+ <div class="stat-card company-digest-card company-digest-empty">
+ <div class="company-digest-header">
+ <h3 class="company-digest-name">${_digestEscape(c.company)}</h3>
+ </div>
+ <p class="company-digest-no-activity">No notable activity in this period.</p>
+ </div>`;
         }
 
         const sectionsHtml = sections.map(s => `
-            <div class="company-digest-section">
-                <div class="company-digest-section-label">${s.label}</div>
-                <ul>${s.items.map(i => `<li>${_digestEscape(String(i))}</li>`).join('')}</ul>
-            </div>`).join('');
+ <div class="company-digest-section">
+ <div class="company-digest-section-label">${s.label}</div>
+ <ul>${s.items.map(i => `<li>${_digestEscape(String(i))}</li>`).join('')}</ul>
+ </div>`).join('');
 
         const nextAction = c.next_action ? `
-            <div class="company-digest-action">
-                <span class="company-digest-action-label">Recommended Next Action</span>
-                <span class="company-digest-action-text">${_digestEscape(String(c.next_action))}</span>
-            </div>` : '';
+ <div class="company-digest-action">
+ <span class="company-digest-action-label">Recommended Next Action</span>
+ <span class="company-digest-action-text">${_digestEscape(String(c.next_action))}</span>
+ </div>` : '';
 
         return `
-            <div class="stat-card company-digest-card">
-                <div class="company-digest-header">
-                    <h3 class="company-digest-name">${_digestEscape(c.company)}</h3>
-                </div>
-                <div class="company-digest-body">
+ <div class="stat-card company-digest-card">
+ <div class="company-digest-header">
+ <h3 class="company-digest-name">${_digestEscape(c.company)}</h3>
+ </div>
+ <div class="company-digest-body">
                     ${sectionsHtml}
                     ${nextAction}
-                </div>
-            </div>`;
+ </div>
+ </div>`;
     }).join('');
 
     return metaBar + `<div class="company-digest-grid">${cards}</div>`;
@@ -1007,17 +1082,17 @@ async function loadDigest() {
 
         if (!data.digest) {
             container.innerHTML = `
-                <div class="empty-state">
-                    <div class="icon">📊</div>
-                    <h3>No digest generated yet</h3>
-                    <p>Select a timeframe above and click "Generate Digest" to create your first portfolio digest.</p>
-                </div>`;
+ <div class="empty-state">
+ <div class="icon"></div>
+ <h3>No digest generated yet</h3>
+ <p>Select a timeframe above and click "Generate Digest" to create your first portfolio digest.</p>
+ </div>`;
             return;
         }
 
         container.innerHTML = renderDigestData(data.digest);
     } catch (e) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to load digest</h3></div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon"></div><h3>Failed to load digest</h3></div>';
     }
 }
 
@@ -1044,7 +1119,7 @@ async function generateDigest() {
         container.innerHTML = renderDigestData(digestRow);
         showToast(data.updated_existing ? 'Digest updated!' : 'Digest generated!', 'success');
     } catch (e) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to generate digest</h3></div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon"></div><h3>Failed to generate digest</h3></div>';
         showToast('Failed to generate digest', 'error');
     }
 }
@@ -1060,28 +1135,28 @@ async function loadSources() {
         const data = await res.json();
 
         container.innerHTML = data.sources.map(s => `
-            <div class="content-card">
-                <div class="content-card-header">
-                    <div class="content-card-title">
+ <div class="content-card">
+ <div class="content-card-header">
+ <div class="content-card-title">
                         ${s.url ? `<a href="${s.url}" target="_blank">${s.name}</a>` : s.name}
-                    </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <span class="tag tag-${s.type}">${s.type}</span>
-                        <span style="font-size: 0.75rem; color: ${s.is_active ? 'var(--success)' : 'var(--danger)'};">
+ </div>
+ <div style="display: flex; gap: 8px; align-items: center;">
+ <span class="tag tag-${s.type}">${s.type}</span>
+ <span style="font-size: 0.75rem; color: ${s.is_active ? 'var(--success)' : 'var(--danger)'};">
                             ${s.is_active ? '● Active' : '○ Inactive'}
-                        </span>
-                    </div>
-                </div>
-                <div class="content-card-meta">
-                    <span class="meta-item">⭐ Priority: ${s.priority}/5</span>
-                    <span class="meta-item">📦 ${s.item_count || 0} items</span>
-                    ${s.rss_feed_url ? `<span class="meta-item">📡 RSS</span>` : ''}
-                    ${s.last_fetched_at ? `<span class="meta-item">🕐 Last: ${new Date(s.last_fetched_at).toLocaleDateString()}</span>` : ''}
-                </div>
-            </div>
+ </span>
+ </div>
+ </div>
+ <div class="content-card-meta">
+ <span class="meta-item">⭐ Priority: ${s.priority}/5</span>
+ <span class="meta-item"> ${s.item_count || 0} items</span>
+                    ${s.rss_feed_url ? `<span class="meta-item">RSS</span>` : ''}
+                    ${s.last_fetched_at ? `<span class="meta-item">Last: ${new Date(s.last_fetched_at).toLocaleDateString()}</span>` : ''}
+ </div>
+ </div>
         `).join('');
     } catch (e) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>Failed to load sources</h3></div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon"></div><h3>Failed to load sources</h3></div>';
     }
 }
 
@@ -1239,7 +1314,7 @@ async function clearAllContent() {
             showToast('Failed to clear dashboard', 'error');
         }
         
-        if (btn) btn.innerHTML = '🗑️ Clear All';
+        if (btn) btn.innerHTML = ' Clear All';
     } catch (e) {
         showToast('Error clearing dashboard', 'error');
     }

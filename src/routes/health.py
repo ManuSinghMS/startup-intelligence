@@ -1,13 +1,64 @@
 """
 Health check, ingestion triggers, analytics, and system status routes.
+
+Ingestion design notes
+----------------------
+The Fly.io trial tier kills machines after 5 minutes of activity. To keep
+ingestion responsive and resilient to that timeout:
+
+* POST /api/ingest returns immediately with status="started" and kicks off
+  a background asyncio task.
+* The background task processes 25 companies (configurable via
+  INGEST_BATCH_LIMIT) using the oldest-first rolling batch order, so
+  repeated clicks cycle through the full portfolio.
+* Each company's items are classified immediately after that company is
+  ingested. If the trial timeout kills the machine mid-batch, all already-
+  processed companies remain fully classified — no items stuck in the
+  'unclassified' state.
+* GET /api/ingest/status returns live progress (current company, X of Y,
+  new items so far, classified so far) which the dashboard polls.
 """
+import asyncio
+from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+
 from src.db.database import get_db, count_records
 
 router = APIRouter(prefix="/api", tags=["system"])
+
+
+# Module-level state for the currently running ingestion job. There is at
+# most one job at a time per process; clicking the button while a job is
+# already running returns the existing progress instead of starting a new one.
+_ingestion_state: dict = {
+    "status": "idle",          # idle | running | completed | error
+    "started_at": None,
+    "finished_at": None,
+    "current_company": None,
+    "completed": 0,
+    "total": 0,
+    "new_items": 0,
+    "classified": 0,
+    "mode": None,              # "all" | "selected"
+    "error": None,
+    "recent_log": [],          # last N log lines, for the UI
+}
+
+# In-memory log ring buffer for the UI ("View Logs" panel).
+_log_buffer: List[str] = []
+_LOG_BUFFER_MAX = 200
+
+
+def _log(msg: str):
+    """Append a line to both stdout and the in-memory log buffer."""
+    stamped = f"{datetime.utcnow().strftime('%H:%M:%S')} {msg}"
+    print(stamped, flush=True)
+    _log_buffer.append(stamped)
+    if len(_log_buffer) > _LOG_BUFFER_MAX:
+        del _log_buffer[: len(_log_buffer) - _LOG_BUFFER_MAX]
 
 
 class IngestRequest(BaseModel):
@@ -73,67 +124,150 @@ def system_stats():
     }
 
 
+async def _run_ingestion_job(startup_ids: Optional[List[str]]):
+    """Background coroutine — drives the ingestion and updates _ingestion_state."""
+    from src.ingestion.company_search import (
+        ingest_all_companies,
+        ingest_selected_companies,
+    )
+
+    _ingestion_state["status"] = "running"
+    _ingestion_state["started_at"] = datetime.utcnow().isoformat()
+    _ingestion_state["finished_at"] = None
+    _ingestion_state["current_company"] = None
+    _ingestion_state["completed"] = 0
+    _ingestion_state["new_items"] = 0
+    _ingestion_state["classified"] = 0
+    _ingestion_state["error"] = None
+    _ingestion_state["mode"] = "selected" if startup_ids else "all"
+    # Reuse progress dict shared with the worker
+    progress = _ingestion_state
+
+    try:
+        if startup_ids:
+            _log(f"[Ingest] Started: {len(startup_ids)} selected companies")
+            await ingest_selected_companies(startup_ids, progress=progress)
+        else:
+            _log(f"[Ingest] Started: rolling batch (oldest-first)")
+            await ingest_all_companies(progress=progress)
+        _ingestion_state["status"] = "completed"
+        _log(f"[Ingest] Completed: {_ingestion_state['completed']}/{_ingestion_state['total']} "
+             f"companies, {_ingestion_state['new_items']} new items, "
+             f"{_ingestion_state['classified']} classified")
+    except asyncio.CancelledError:
+        _ingestion_state["status"] = "cancelled"
+        _log("[Ingest] Cancelled (machine likely shutting down)")
+        raise
+    except Exception as e:
+        _ingestion_state["status"] = "error"
+        _ingestion_state["error"] = str(e)
+        _log(f"[Ingest] Error: {e}")
+    finally:
+        _ingestion_state["finished_at"] = datetime.utcnow().isoformat()
+
+
 @router.post("/ingest")
 async def trigger_ingestion(body: IngestRequest = None):
-    """Manually trigger ingestion — all companies or selected ones."""
-    if body and body.startup_ids and len(body.startup_ids) > 0:
-        from src.ingestion.company_search import ingest_selected_companies
-        results = await ingest_selected_companies(body.startup_ids)
-    else:
-        from src.ingestion.company_search import ingest_all_companies
-        results = await ingest_all_companies()
+    """
+    Kick off ingestion in the background and return immediately.
 
-    total_new = sum(r.get("new", 0) for r in results)
+    The browser shouldn't wait for a multi-minute request to finish: it
+    returns instantly, then polls GET /api/ingest/status.
+    """
+    if _ingestion_state["status"] == "running":
+        return {
+            "status": "already_running",
+            "message": "An ingestion job is already in progress.",
+            "progress": _public_progress(),
+        }
 
-    # Auto-classify new items
-    try:
-        from src.llm.classifier import classify_unclassified
-        classify_stats = await classify_unclassified(limit=200)
-        print(f"[Ingest] Auto-classified {classify_stats.get('classified', 0)} items")
-    except Exception as e:
-        print(f"[Ingest] Auto-classify error (non-critical): {e}")
-        classify_stats = {}
-
+    startup_ids = body.startup_ids if (body and body.startup_ids) else None
+    asyncio.create_task(_run_ingestion_job(startup_ids))
     return {
-        "status": "completed",
-        "total_new": total_new,
-        "total_matched": total_new,
-        "classified": classify_stats.get("classified", 0),
-        "sources": results
+        "status": "started",
+        "mode": "selected" if startup_ids else "all",
+        "batch_size": len(startup_ids) if startup_ids else None,
+        "message": "Ingestion started. Poll /api/ingest/status for progress.",
     }
+
+
+def _public_progress() -> dict:
+    """Build the JSON-safe progress payload (skip noisy fields)."""
+    skip = {"recent_log"}
+    return {k: v for k, v in _ingestion_state.items() if k not in skip}
 
 
 @router.get("/ingest/status")
 def get_ingestion_status():
-    """Get ingestion progress and history."""
+    """
+    Live progress for the in-flight ingestion job + rolling batch summary.
+
+    The dashboard polls this every few seconds while a job is running.
+    """
     db = get_db()
-    
-    # Total active companies
-    total = db.execute("SELECT COUNT(*) as c FROM startups WHERE tag IS NULL OR tag != 'not_active'").fetchone()
-    
-    # Companies ingested in the last hour (this batch cycle)
+
+    total = db.execute(
+        "SELECT COUNT(*) as c FROM startups WHERE tag IS NULL OR tag != 'not_active'"
+    ).fetchone()
+
+    # Companies whose last_ingested_at is within the last 24h, for the
+    # "cycle so far" indicator on the UI.
+    cycle = db.execute("""
+        SELECT COUNT(*) as c FROM startups
+        WHERE last_ingested_at > datetime('now', '-24 hour')
+          AND (tag IS NULL OR tag != 'not_active')
+    """).fetchone()
+
+    # Names of companies processed in the last hour (this run / recent run).
     recently_ingested = db.execute("""
-        SELECT name, last_ingested_at FROM startups 
+        SELECT name, last_ingested_at FROM startups
         WHERE last_ingested_at > datetime('now', '-1 hour')
         ORDER BY last_ingested_at DESC
+        LIMIT 50
     """).fetchall()
-    
-    recent_list = [dict(row) for row in recently_ingested]
-    recent_count = len(recent_list)
-    
+
     return {
+        "job": _public_progress(),
         "total_companies": total["c"],
-        "recently_ingested": recent_count,
-        "remaining": max(0, total["c"] - recent_count),
-        "companies_this_batch": recent_list
+        "cycled_24h": cycle["c"],
+        "remaining_24h": max(0, total["c"] - cycle["c"]),
+        "recently_ingested": [dict(r) for r in recently_ingested],
     }
+
+
+@router.get("/ingest/logs")
+def get_ingestion_logs():
+    """Recent in-memory log lines, for the dashboard log panel."""
+    return {"lines": list(_log_buffer)}
+
+
+@router.post("/ingest/forge-feed")
+async def ingest_forge_feed():
+    """
+    One-off: pull The Forge's incubator RSS feed.
+
+    Kept separate from /api/ingest so it doesn't eat into the 5-minute
+    Fly.io trial budget on every batch click.
+    """
+    try:
+        from src.ingestion.rss_ingester import ingest_feed
+        master_source = {
+            "id": "the-forge-master",
+            "name": "The Forge McMaster",
+            "type": "blog",
+            "rss_feed_url": "https://theforge.mcmaster.ca/feed/",
+        }
+        stats = await ingest_feed(master_source, fallback_startup_id="the-forge-mcmaster")
+        return {"status": "completed", **stats}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/classify")
 async def trigger_classification():
-    """Manually trigger classification of unclassified items."""
+    """Manually trigger classification of remaining unclassified items."""
     from src.llm.classifier import classify_unclassified
-    result = await classify_unclassified()
+    result = await classify_unclassified(limit=100)
     return result
 
 
@@ -208,7 +342,6 @@ def get_analytics():
         LIMIT 10
     """).fetchall()
 
-    # Category breakdown per company
     category_by_company = {}
     for category in ["funding", "hiring", "product_launch", "milestone", "partnership", "customer_win"]:
         rows = db.execute("""
