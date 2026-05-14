@@ -30,6 +30,25 @@ milestone / partnership / customer win / general using an LLM (Groq's free
 tier by default). The dashboard groups recent items by company and offers a
 weekly digest summary.
 
+## Relevance scoring
+
+Each article fetched from Google News is scored before being stored.
+Founder names are the primary signal because company names rename more
+often than founders do.
+
+| Signal                       | Score        | Why                                          |
+|------------------------------|--------------|----------------------------------------------|
+| Founder name in title        | 0.90         | Highest confidence - founder explicitly mentioned |
+| Founder name in body         | 0.70         | Strong signal                                |
+| Company name in title        | 0.50         | Moderate - company names change              |
+| Company name in body         | 0.30         | Low - generic mentions                       |
+| Founder + company both match | +0.10 bonus  | Cross-match boost (capped at 1.0)            |
+
+Scores under 0.25 are rejected. Borderline cases (short generic names,
+company-only matches) get a second pass through an LLM verifier with the
+Forge/McMaster context before being stored. See
+[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for the full pipeline.
+
 ## Quick local run
 
 ```bash

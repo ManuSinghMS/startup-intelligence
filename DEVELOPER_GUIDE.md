@@ -83,14 +83,31 @@ This is the part that took the most rework, so it is worth understanding.
    like "McMaster", "incubator", and key terms from the description).
 2. Fetches `https://news.google.com/rss/search?q=...` and parses the RSS.
 3. For each entry: scores it with
-   `src/scoring/relevance.py::score_relevance` (founder names weighted
-   higher than company names because company names rename more often).
-4. In **fast mode** (the default): items below confidence 0.45 are
-   dropped. The LLM relevance verifier is skipped (it is slow and the
-   scoring already does a decent job).
-5. In **slow/precise mode**: items below confidence 0.8 OR from
-   short-named companies also go through `verify_relevance_with_llm`
-   which asks the LLM "is this article actually about this company".
+   `src/scoring/relevance.py::score_relevance`. Founder names are
+   weighted higher than company names because company names rename more
+   often. The table:
+
+   | Signal                            | Score          | Why                                          |
+   |-----------------------------------|----------------|----------------------------------------------|
+   | Founder name in title             | 0.90           | Highest confidence - founder explicitly mentioned |
+   | Founder name in body              | 0.70           | Strong signal                                |
+   | Company name in title             | 0.50           | Moderate - company names change              |
+   | Company name in body              | 0.30           | Low - generic mentions                       |
+   | Founder + company both match      | +0.10 bonus    | Cross-match boost (capped at 1.0)            |
+
+   Below 0.25 is rejected outright as not relevant.
+
+4. **LLM verification** runs (within a per-company cap of 3) on the
+   risky scoring outcomes - mainly company-only matches on short
+   generic names like "Blue Orchid" or "Take Care" where the string
+   alone cannot disambiguate. The verifier prompt gives the LLM the
+   Forge/McMaster context plus any description/industry/website the
+   startup has on file.
+5. In **fast mode** (the default): LLM verify is reserved for the
+   narrow risky cases listed above to keep the per-company time budget
+   inside Fly's 5-minute trial window. **Precise mode** verifies more
+   aggressively (any name <=3 words, any confidence <0.8). Toggle via
+   the `fast` arg on `ingest_for_company`.
 6. Surviving items are written to `content_items` with
    `classification='unclassified'` and the score in `confidence_score`.
 7. The function returns the list of new item IDs.
