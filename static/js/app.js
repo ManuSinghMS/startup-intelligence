@@ -936,6 +936,7 @@ async function pollIngestionStatus(silentIfIdle) {
             barEl.style.width = pct + '%';
             metaEl.textContent = `New items so far: ${job.new_items || 0} - Classified: ${job.classified || 0}`;
             currentEl.textContent = job.current_company ? `Currently processing: ${job.current_company}` : '';
+            renderProcessedList(job.processed || []);
             refreshIngestionLogs();
         } else if (job.status === 'completed') {
             progressBox.style.display = 'block';
@@ -943,6 +944,7 @@ async function pollIngestionStatus(silentIfIdle) {
             barEl.style.width = '100%';
             currentEl.textContent = '';
             metaEl.textContent = `Cycle so far: ${data.cycled_24h} of ${data.total_companies} in the last 24h.`;
+            renderProcessedList(job.processed || []);
             refreshCycleSummary();
             loadDashboard();
             refreshIngestionLogs();
@@ -950,6 +952,7 @@ async function pollIngestionStatus(silentIfIdle) {
         } else if (job.status === 'error') {
             progressBox.style.display = 'block';
             statusEl.textContent = `Error: ${job.error}`;
+            renderProcessedList(job.processed || []);
             refreshIngestionLogs();
             _stopIngestPolling();
         } else {
@@ -961,6 +964,44 @@ async function pollIngestionStatus(silentIfIdle) {
     };
     await tick();
     _ingestPollHandle = setInterval(tick, 2500);
+}
+
+function _escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function renderProcessedList(processed) {
+    const listEl = document.getElementById('ingestion-processed-list');
+    const countEl = document.getElementById('ingestion-processed-count');
+    if (!listEl) return;
+    if (!processed || processed.length === 0) {
+        listEl.innerHTML = '<span style="color: var(--text-muted);">None yet.</span>';
+        if (countEl) countEl.textContent = '';
+        return;
+    }
+    if (countEl) countEl.textContent = `(${processed.length})`;
+    // Render newest first so the user sees the latest company at the top.
+    const reversed = processed.slice().reverse();
+    listEl.innerHTML = reversed.map((p, idx) => {
+        const num = processed.length - idx;
+        if (p.error) {
+            return `<div style="padding: 3px 0; display: flex; justify-content: space-between; gap: 8px;">
+                <span><span style="color: var(--text-muted);">${num}.</span> ${_escapeHtml(p.name)}</span>
+                <span style="color: #ef4444; font-size: 0.75rem;">error</span>
+            </div>`;
+        }
+        const newCount = p.new || 0;
+        const tag = newCount > 0
+            ? `<span style="color: #10b981;">+${newCount} new</span>`
+            : `<span style="color: var(--text-muted);">no new</span>`;
+        const dupes = p.duplicate ? ` <span style="color: var(--text-muted); font-size: 0.72rem;">(${p.duplicate} dup)</span>` : '';
+        return `<div style="padding: 3px 0; display: flex; justify-content: space-between; gap: 8px;">
+            <span><span style="color: var(--text-muted);">${num}.</span> ${_escapeHtml(p.name)}</span>
+            <span style="font-size: 0.78rem;">${tag}${dupes}</span>
+        </div>`;
+    }).join('');
 }
 
 async function refreshIngestionLogs() {

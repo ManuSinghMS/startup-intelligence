@@ -650,11 +650,20 @@ async def _run_ingestion(startups: list, progress: Optional[dict] = None) -> lis
                     print(f"  [Classify import] {e}")
             total_classified += classified_here
 
-            results.append({
+            entry = {
                 "startup": startup["name"],
                 **{k: v for k, v in stats.items() if k != "new_item_ids"},
                 "classified": classified_here,
-            })
+            }
+            results.append(entry)
+            if progress is not None:
+                progress.setdefault("processed", []).append({
+                    "name": startup["name"],
+                    "new": stats["new"],
+                    "found": stats["found"],
+                    "classified": classified_here,
+                    "duplicate": stats["duplicate"],
+                })
             print(f"  [{startup['name']}] found={stats['found']}, "
                   f"new={stats['new']}, classified={classified_here}, "
                   f"dupes={stats['duplicate']}")
@@ -664,6 +673,11 @@ async def _run_ingestion(startups: list, progress: Optional[dict] = None) -> lis
                 "startup": startup["name"],
                 "error": str(e)
             })
+            if progress is not None:
+                progress.setdefault("processed", []).append({
+                    "name": startup["name"],
+                    "error": str(e),
+                })
 
         # Record ingestion time to support round-robin batching
         db.execute(

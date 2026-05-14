@@ -44,6 +44,7 @@ _ingestion_state: dict = {
     "classified": 0,
     "mode": None,              # "all" | "selected"
     "error": None,
+    "processed": [],           # per-company results from the current run
     "recent_log": [],          # last N log lines, for the UI
 }
 
@@ -140,6 +141,7 @@ async def _run_ingestion_job(startup_ids: Optional[List[str]]):
     _ingestion_state["classified"] = 0
     _ingestion_state["error"] = None
     _ingestion_state["mode"] = "selected" if startup_ids else "all"
+    _ingestion_state["processed"] = []
     # Reuse progress dict shared with the worker
     progress = _ingestion_state
 
